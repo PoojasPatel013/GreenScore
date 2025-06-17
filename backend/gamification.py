@@ -1,5 +1,26 @@
 class Gamification:
     def __init__(self):
+        # Carbon impact factors (kg CO2 per unit)
+        self.carbon_factors = {
+            'transport': 0.2,  # kg CO2 per km
+            'diet': {
+                'vegetarian': 2.5,  # kg CO2 per day
+                'pescatarian': 3.5,  # kg CO2 per day
+                'omnivore': 4.5     # kg CO2 per day
+            },
+            'energy': 0.5,  # kg CO2 per kWh
+            'shopping': 0.1  # kg CO2 per $100
+        }
+        
+        # Points calculation factors
+        self.points_factors = {
+            'transport': 1,  # points per kg CO2 saved
+            'diet': 2,      # points per kg CO2 saved
+            'energy': 1.5,  # points per kg CO2 saved
+            'shopping': 0.5 # points per kg CO2 saved
+        }
+        
+        # Initialize badges and challenges
         self.badges = {
             'no_meat': {
                 'name': 'Herbivore Hero',
@@ -53,6 +74,22 @@ class Gamification:
                 'icon': '♻️'
             }
         }
+
+    def calculate_carbon_impact(self, transport: float, diet: str, energy: float, shopping: float) -> float:
+        """Calculate carbon impact based on user inputs"""
+        impact = (
+            transport * self.carbon_factors['transport'] +
+            self.carbon_factors['diet'][diet] +
+            energy * self.carbon_factors['energy'] +
+            (shopping / 100) * self.carbon_factors['shopping']
+        )
+        return impact
+
+    def calculate_points(self, carbon_impact: float, category: str = 'mixed') -> int:
+        """Calculate points based on carbon impact and category"""
+        if category == 'mixed':
+            return int(carbon_impact * sum(self.points_factors.values()) / len(self.points_factors))
+        return int(carbon_impact * self.points_factors.get(category, 1))
 
     def check_badges(self, user_id, transactions):
         """Check if user qualifies for any badges"""

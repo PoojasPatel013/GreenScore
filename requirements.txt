@@ -1,9 +1,15 @@
 streamlit
 flask
-pandas
+flask-socketio
+eventlet
+flask-login
+flask-bcrypt
 pymongo
 python-dotenv
 requests
 plotly
 numpy
 streamlit_lottie
+python-jose[cryptography]
+python-dotenv
+email-validator
