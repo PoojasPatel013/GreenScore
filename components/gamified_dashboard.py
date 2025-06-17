@@ -278,122 +278,7 @@ def dashboard():
                st.session_state.user_data['energy'],
                st.session_state.user_data['shopping'],
                st.session_state.carbon_value), unsafe_allow_html=True)
-
-    # Add Event Form
-    with st.form("event_form_1"):
-        st.markdown("""
-            <div class="event-form-container floating-card">
-                <h2 class="rainbow-text">➕ Log Eco Event</h2>
-                <div class="event-form">
-                    <div class="event-type">
-                        <label class="victorian-label">Event Type</label>
-                        <select class="victorian-select" 
-                                name="event_type" 
-                                key="event_type_select">
-                            <option value="Transport">Transport 🚴‍♂️</option>
-                            <option value="Food">Food 🥗</option>
-                            <option value="Energy">Energy ⚡</option>
-                            <option value="Shopping">Shopping 🛍️</option>
-                        </select>
-                    </div>
-                    <div class="impact-value">
-                        <label class="victorian-label">Impact Value</label>
-                        <input type="number" 
-                               class="victorian-input" 
-                               name="impact" 
-                               min="0" 
-                               step="0.1"
-                               key="impact_input">
-                    </div>
-                    <button type="submit" 
-                            class="submit-button pulse-card"
-                            key="submit_button">
-                        Log Event 🚀
-                    </button>
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
-        
-        # Add submit button and handle form submission
-        submit_button = st.form_submit_button("Log Event", type="primary")
-        if submit_button:
-            # Get form values
-            event_type = st.session_state.event_type_select
-            impact = st.session_state.impact_input
             
-            if impact and float(impact) > 0:
-                event = {
-                    'type': event_type,
-                    'impact': float(impact),
-                    'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    'points': round(float(impact) * 10)
-                }
-                st.session_state.events.append(event)
-                st.session_state.points += event['points']
-                st.session_state.carbon_value += float(impact)
-                st.session_state.xp += event['points']
-                
-                # Level up logic
-                if st.session_state.xp >= st.session_state.next_level:
-                    st.session_state.level += 1
-                    st.session_state.xp = 0
-                    st.session_state.next_level = int(st.session_state.next_level * 1.5)
-                    st.success(f"Level up! You're now Level {st.session_state.level}!")
-                    
-                st.balloons()
-                st.success(f"Event logged! +{event['points']} Points earned!")
-                
-                # Reset form values
-                st.session_state.event_type_select = "Transport"
-                st.session_state.impact_input = 0.0
-                
-                # Clear the form
-                st.experimental_rerun()
-
-    # Events History
-    if st.session_state.events:
-        st.markdown("""
-            <div class="victorian-events floating-card">
-                <h2 class="rainbow-text">📜 Recent Eco Events</h2>
-                <div class="events-list victorian-list">
-        """, unsafe_allow_html=True)
-
-        for event in reversed(st.session_state.events):
-            st.markdown("""
-                <div class="event-item victorian-item pulse-card">
-                    <div class="event-icon victorian-icon">{icon}</div>
-                    <div class="event-details victorian-details">
-                        <p class="victorian-text">{type} - Saved {impact}kg CO₂</p>
-                        <span class="timestamp victorian-timestamp">{time}</span>
-                    </div>
-                    <div class="event-reward victorian-reward">
-                        <span class="victorian-points">+{points} Points</span>
-                    </div>
-                </div>
-            """.format(
-                icon={
-                    "Transport": "🚴‍♂️",
-                    "Food": "🥗",
-                    "Energy": "⚡",
-                    "Shopping": "🛍️"
-                }[event['type']],
-                type=event['type'],
-                impact=event['impact'],
-                time=event['timestamp'],
-                points=event['points']
-            ), unsafe_allow_html=True)
-
-        st.markdown("""
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
-    else:
-        st.markdown("""
-            <div class="victorian-events floating-card">
-                <h2 class="rainbow-text">📜 Recent Eco Events</h2>
-                <p class="victorian-text">No events logged yet. Start tracking your eco-impact today!</p>
-            </div>
-        """, unsafe_allow_html=True)
 
     # Points Display
     st.markdown("""
@@ -424,6 +309,20 @@ def dashboard():
 
     # Add dynamic tip display
     if st.session_state.show_tips:
+        tips = [
+            "💡 Tip: Use public transport instead of driving alone",
+            "💡 Tip: Reduce meat consumption for lower carbon footprint",
+            "💡 Tip: Switch to LED bulbs for energy savings",
+            "💡 Tip: Shop locally to reduce transportation emissions"
+        ]
+        current_tip = tips[st.session_state.tip_index % len(tips)]
+        
+        st.markdown(f"""
+            <div class="tip-container">
+                <p class="tip-text">{current_tip}</p>
+                <button class="tip-button" onclick="nextTip()">Next Tip</button>
+            </div>
+        """, unsafe_allow_html=True)
 
     # Add CSS for animations
     st.markdown("""
