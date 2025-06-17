@@ -1,59 +1,117 @@
 import streamlit as st
 from datetime import datetime
 import pandas as pd
-import streamlit as st
 import sys
 import os
+import socketio
+from flask import Flask, request
+from flask_login import LoginManager, UserMixin, login_user, login_required, current_user, logout_user
+from werkzeug.security import generate_password_hash, check_password_hash
+from typing import Dict, List
 
 # Add the project root directory to Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from backend import TransactionAnalyzer, CarbonCalculator, RecommendationEngine, Database
+from backend.database import Database
+from backend.transaction_analyzer import TransactionAnalyzer
+from backend.carbon_calculator import CarbonCalculator
+from backend.recommendation_engine import RecommendationEngine
+from backend.auth import AuthService
+from backend.socket_service import SocketService
 from components.transaction_form import transaction_form
 from components.gamified_dashboard import dashboard
 from components.leaderboard import leaderboard
+from components.auth import login_page, signup_page, profile_page, account_dashboard
 
-# Initialize database and components
+# Initialize Flask app
+app = Flask(__name__)
+app.secret_key = os.getenv('SECRET_KEY', 'your-secret-key')
+
+# Initialize Socket.IO
+socketio = socketio.Server()
+app.wsgi_app = socketio.WSGIApp(socketio, app.wsgi_app)
+
+# Initialize services
 db = Database()
 analyzer = TransactionAnalyzer()
 calculator = CarbonCalculator()
 recommender = RecommendationEngine()
+auth_service = AuthService(db)
+socket_service = SocketService(socketio)
 
+# Initialize Flask-Login
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+
+# User loader for Flask-Login
+@login_manager.user_loader
+def load_user(user_id):
+    user_data = db.get_user_by_id(user_id)
+    if user_data:
+        return User(user_id=user_id, **user_data)
+    return None
+
+# Streamlit app
 def main():
     st.set_page_config(
         page_title="GreenScore",
         page_icon="🌱",
         layout="wide"
     )
-    
+
+    # Check if user is logged in
+    if not current_user.is_authenticated:
+        # Show login/signup options
+        st.title("Welcome to GreenScore 🌱")
+        
+        # Login/Signup tabs
+        auth_tab = st.tabs(["Login", "Sign Up"])
+        
+        with auth_tab[0]:
+            login_page()
+        with auth_tab[1]:
+            signup_page()
+        
+        st.stop()  # Stop rendering if not logged in
+
     # Sidebar
     st.sidebar.title("GreenScore 🌱")
-    st.sidebar.markdown("---")
-    
-    # User Dashboard
-    col1, col2 = st.sidebar.columns(2)
-    with col1:
-        st.metric("Your Score", "1200")
-    with col2:
-        st.metric("Trees Planted", "3")
-    
+
+    # User profile section
+    profile = db.get_profile(current_user.id)
+    if profile:
+        st.sidebar.image(profile.get('avatar_url', 'default-avatar.png'), width=100)
+        st.sidebar.markdown(f"**{profile.get('full_name', 'User')}**")
+        st.sidebar.markdown(profile.get('bio', ''))
+
+    # Leaderboard position
+    rank = db.get_user_rank(current_user.id)
+    st.sidebar.markdown(f"**Rank**: #{rank}")
+
     # Navigation
     page = st.sidebar.radio(
         "Navigation",
-        ["Dashboard", "Add Transaction", "Leaderboard", "Recommendations"],
+        ["Dashboard", "Add Transaction", "Leaderboard", "Profile", "Account", "Logout"],
         index=0
     )
-    
+
     # Main content
     if page == "Dashboard":
-        dashboard()
+        dashboard(current_user.id)
     elif page == "Add Transaction":
-        show_transactions()
+        transaction_form(current_user.id)
     elif page == "Leaderboard":
-        show_leaderboard()
-    elif page == "Recommendations":
-        show_recommendations()
-    
+        leaderboard()
+    elif page == "Profile":
+        profile_page(current_user.id)
+    elif page == "Account":
+        account_dashboard(current_user.id)
+    elif page == "Logout":
+        logout_user()
+        st.success("Logged out successfully")
+        st.stop()
+        
     st.markdown("""
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
@@ -62,7 +120,6 @@ def main():
         }
         </style>
         """, unsafe_allow_html=True)
-    
     if page == "Dashboard":
         dashboard()
     elif page == "Add Transaction":

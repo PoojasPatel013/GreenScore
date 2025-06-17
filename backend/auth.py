@@ -1,7 +1,7 @@
 from flask_login import LoginManager, UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Dict, List
 from .database import Database
 from .models import User
 

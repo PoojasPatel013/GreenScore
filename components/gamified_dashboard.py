@@ -7,12 +7,13 @@ from datetime import datetime
 # Initialize gamification
 gamification = Gamification()
 
-def dashboard():
+def dashboard(user_id):
     """
     Display the gamified dashboard with carbon footprint tracking and eco events.
     """
     # Initialize session state
     state_defaults = {
+        'user_id': user_id,
         'events': [],
         'user_data': {
             'transport': 0,
