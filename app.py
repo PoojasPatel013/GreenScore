@@ -45,6 +45,15 @@ def main():
     )
     
     # Main content
+    if page == "Dashboard":
+        dashboard()
+    elif page == "Add Transaction":
+        show_transactions()
+    elif page == "Leaderboard":
+        show_leaderboard()
+    elif page == "Recommendations":
+        show_recommendations()
+    
     st.markdown("""
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
