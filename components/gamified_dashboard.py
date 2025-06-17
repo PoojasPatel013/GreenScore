@@ -155,33 +155,55 @@ def dashboard():
 
     st.plotly_chart(fig)
 
+    # Log Event
+    if st.button("Log Event"):
+        event_type = st.selectbox("Event Type", ["Transport", "Food", "Energy", "Shopping"])
+        impact = st.number_input("Impact (kg CO₂)", min_value=0.0, value=0.0)
+        if impact > 0:
+            event = {
+                'type': event_type,
+                'impact': impact,
+                'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M")
+            }
+            st.session_state.events.append(event)
+            st.session_state.user_data['carbon_footprint'] += impact
+
     # Recent Events
-    st.markdown("""
-        <div class="events-panel">
-            <h3>📅 Recent Events</h3>
-            <div class="events-list">
+    if st.session_state.events:
+        st.markdown("""
+            <div class="events-panel">
+                <h3>📅 Recent Events</h3>
+                <div class="events-list">
+        """, unsafe_allow_html=True)
+        
+        for event in reversed(st.session_state.events):
+            st.markdown("""
                 <div class="event-item">
-                    <div class="event-icon">🚴‍♂️</div>
+                    <div class="event-icon">{icon}</div>
                     <div class="event-details">
-                        <p>Biked to work - Saved 2.5kg CO₂</p>
-                        <span class="timestamp">10:30 AM</span>
+                        <p>{type} - Saved {impact}kg CO₂</p>
+                        <span class="timestamp">{time}</span>
                     </div>
                     <div class="event-reward">
-                        <span>+50 Points</span>
+                        <span>+{points} Points</span>
                     </div>
                 </div>
-                <div class="event-item">
-                    <div class="event-icon">🥗</div>
-                    <div class="event-details">
-                        <p>Plant-based meal - Saved 1.2kg CO₂</p>
-                        <span class="timestamp">12:00 PM</span>
-                    </div>
-                    <div class="event-reward">
-                        <span>+30 Points</span>
-                    </div>
+            """.format(
+                icon={
+                    "Transport": "🚴‍♂️",
+                    "Food": "🥗",
+                    "Energy": "⚡",
+                    "Shopping": "🛍️"
+                }[event['type']],
+                type=event['type'],
+                impact=event['impact'],
+                time=event['timestamp'],
+                points=round(event['impact'] * 10)
+            ), unsafe_allow_html=True)
+        
+        st.markdown("""
                 </div>
             </div>
-        </div>
         """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
