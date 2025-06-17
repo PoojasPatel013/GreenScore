@@ -1,0 +1,9 @@
+streamlit
+flask
+pandas
+pymongo
+python-dotenv
+requests
+plotly
+numpy
+streamlit_lottie
