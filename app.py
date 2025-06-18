@@ -1,171 +1,283 @@
 import streamlit as st
-from datetime import datetime
 import pandas as pd
-import sys
-import os
-import socketio
-from flask import Flask, request
-from flask_login import LoginManager, UserMixin, login_user, login_required, current_user, logout_user
-from werkzeug.security import generate_password_hash, check_password_hash
-from typing import Dict, List
+import plotly.express as px
+import plotly.graph_objects as go
+from datetime import datetime, timedelta
+import requests
+from database import Database
+from carbon_calculator import CarbonCalculator
+from ai_parser import TransactionParser
+from gamification import GamificationEngine
 
-# Add the project root directory to Python path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Initialize components
+@st.cache_resource
+def init_components():
+    db = Database()
+    calculator = CarbonCalculator()
+    parser = TransactionParser()
+    game_engine = GamificationEngine()
+    return db, calculator, parser, game_engine
 
-from backend.database import Database
-from backend.transaction_analyzer import TransactionAnalyzer
-from backend.carbon_calculator import CarbonCalculator
-from backend.recommendation_engine import RecommendationEngine
-from backend.auth import AuthService
-from backend.socket_service import SocketService
-from components.transaction_form import transaction_form
-from components.gamified_dashboard import dashboard
-from components.leaderboard import leaderboard
-from components.auth import login_page, signup_page, profile_page, account_dashboard
-
-# Initialize Flask app
-app = Flask(__name__)
-app.secret_key = os.getenv('SECRET_KEY', 'your-secret-key')
-
-# Initialize Socket.IO
-socketio = socketio.Server()
-app.wsgi_app = socketio.WSGIApp(socketio, app.wsgi_app)
-
-# Initialize services
-db = Database()
-analyzer = TransactionAnalyzer()
-calculator = CarbonCalculator()
-recommender = RecommendationEngine()
-auth_service = AuthService(db)
-socket_service = SocketService(socketio)
-
-# Initialize Flask-Login
-login_manager = LoginManager()
-login_manager.init_app(app)
-login_manager.login_view = 'login'
-
-# User loader for Flask-Login
-@login_manager.user_loader
-def load_user(user_id):
-    user_data = db.get_user_by_id(user_id)
-    if user_data:
-        return User(user_id=user_id, **user_data)
-    return None
-
-# Streamlit app
 def main():
     st.set_page_config(
-        page_title="GreenScore",
+        page_title="GreenScore - Carbon Footprint Tracker",
         page_icon="🌱",
         layout="wide"
     )
-
-    # Check if user is logged in
-    if not current_user.is_authenticated:
-        # Show login/signup options
-        st.title("Welcome to GreenScore 🌱")
-        
-        # Login/Signup tabs
-        auth_tab = st.tabs(["Login", "Sign Up"])
-        
-        with auth_tab[0]:
-            login_page()
-        with auth_tab[1]:
-            signup_page()
-        
-        st.stop()  # Stop rendering if not logged in
-
-    # Sidebar
-    st.sidebar.title("GreenScore 🌱")
-
-    # User profile section
-    profile = db.get_profile(current_user.id)
-    if profile:
-        st.sidebar.image(profile.get('avatar_url', 'default-avatar.png'), width=100)
-        st.sidebar.markdown(f"**{profile.get('full_name', 'User')}**")
-        st.sidebar.markdown(profile.get('bio', ''))
-
-    # Leaderboard position
-    rank = db.get_user_rank(current_user.id)
-    st.sidebar.markdown(f"**Rank**: #{rank}")
-
-    # Navigation
-    page = st.sidebar.radio(
-        "Navigation",
-        ["Dashboard", "Add Transaction", "Leaderboard", "Profile", "Account", "Logout"],
-        index=0
+    
+    db, calculator, parser, game_engine = init_components()
+    
+    # Sidebar navigation
+    st.sidebar.title("🌱 GreenScore")
+    page = st.sidebar.selectbox(
+        "Navigate",
+        ["Dashboard", "Add Transaction", "Goals & Challenges", "Leaderboard", "Recommendations"]
     )
-
-    # Main content
+    
+    # User session (simplified)
+    if 'user_id' not in st.session_state:
+        st.session_state.user_id = "user_123"  # In real app, handle authentication
+    
+    user_id = st.session_state.user_id
+    
     if page == "Dashboard":
-        dashboard(current_user.id)
+        show_dashboard(db, calculator, game_engine, user_id)
     elif page == "Add Transaction":
-        transaction_form(current_user.id)
+        show_add_transaction(db, parser, calculator, user_id)
+    elif page == "Goals & Challenges":
+        show_goals_challenges(db, game_engine, user_id)
     elif page == "Leaderboard":
-        leaderboard()
-    elif page == "Profile":
-        profile_page(current_user.id)
-    elif page == "Account":
-        account_dashboard(current_user.id)
-    elif page == "Logout":
-        logout_user()
-        st.success("Logged out successfully")
-        st.stop()
-        
-    st.markdown("""
-        <style>
-        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
-        body {
-            font-family: 'Roboto', sans-serif;
-        }
-        </style>
-        """, unsafe_allow_html=True)
-    if page == "Dashboard":
-        dashboard()
-    elif page == "Add Transaction":
-        transaction_form()
-    elif page == "Leaderboard":
-        leaderboard()
+        show_leaderboard(db, game_engine)
     elif page == "Recommendations":
-        show_recommendations()
+        show_recommendations(db, calculator, user_id)
 
-def show_home():
-    st.header("Welcome to GreenScore!")
-    st.write("""
-    Track your carbon footprint and earn rewards for going green.
-    Add your transactions manually to start tracking your environmental impact.
-    """)
+def show_dashboard(db, calculator, game_engine, user_id):
+    st.title("🌱 Your Carbon Dashboard")
     
-    # Add transaction form
-    transaction_form()
-
-def show_transactions():
-    if 'connected' not in st.session_state:
-        st.warning("Please connect your bank account first!")
-        return
+    # Get user data
+    user_data = db.get_user_data(user_id)
+    transactions = db.get_user_transactions(user_id, days=30)
     
-    st.header("Your Transactions")
-    transactions = analyzer.get_recent_transactions()
+    # Calculate metrics
+    total_footprint = sum(t['carbon_kg'] for t in transactions)
+    daily_avg = total_footprint / 30 if transactions else 0
+    score = game_engine.calculate_score(user_id, transactions)
     
+    # Display key metrics
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("🌍 Monthly Footprint", f"{total_footprint:.1f} kg CO₂", 
+                 delta=f"{daily_avg:.1f} kg/day")
+    
+    with col2:
+        st.metric("🏆 GreenScore", f"{score:.0f}", 
+                 delta=f"+{game_engine.get_score_change(user_id)}")
+    
+    with col3:
+        level = game_engine.get_user_level(score)
+        st.metric("📈 Level", level['name'], 
+                 delta=f"{score - level['min_score']}/{level['max_score'] - level['min_score']} XP")
+    
+    with col4:
+        trees_planted = user_data.get('trees_planted', 0)
+        st.metric("🌳 Trees Planted", trees_planted)
+    
+    # Charts
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Daily footprint chart
+        if transactions:
+            df = pd.DataFrame(transactions)
+            df['date'] = pd.to_datetime(df['date'])
+            daily_footprint = df.groupby(df['date'].dt.date)['carbon_kg'].sum().reset_index()
+            
+            fig = px.line(daily_footprint, x='date', y='carbon_kg',
+                         title="Daily Carbon Footprint (Last 30 Days)",
+                         labels={'carbon_kg': 'CO₂ (kg)', 'date': 'Date'})
+            st.plotly_chart(fig, use_container_width=True)
+    
+    with col2:
+        # Category breakdown
+        if transactions:
+            category_footprint = df.groupby('category')['carbon_kg'].sum().reset_index()
+            fig = px.pie(category_footprint, values='carbon_kg', names='category',
+                        title="Carbon Footprint by Category")
+            st.plotly_chart(fig, use_container_width=True)
+    
+    # Recent transactions
+    st.subheader("Recent Transactions")
     if transactions:
-        fig = px.bar(transactions, x='date', y='carbon_footprint', 
-                    color='category', title='Carbon Footprint by Category')
-        st.plotly_chart(fig)
+        recent_df = pd.DataFrame(transactions[:10])
+        st.dataframe(recent_df[['date', 'description', 'category', 'amount', 'carbon_kg']], 
+                    use_container_width=True)
 
-def show_recommendations():
-    if 'connected' not in st.session_state:
-        st.warning("Please connect your bank account first!")
-        return
+def show_add_transaction(db, parser, calculator, user_id):
+    st.title("💳 Add Transaction")
     
-    st.header("Eco-Friendly Recommendations")
-    recommendations = recommender.get_recommendations()
-    for rec in recommendations:
-        st.markdown(f"- {rec['description']}")
+    tab1, tab2 = st.tabs(["Manual Entry", "Bank Statement Upload"])
+    
+    with tab1:
+        with st.form("manual_transaction"):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                description = st.text_input("Description", placeholder="e.g., Grocery shopping at Whole Foods")
+                amount = st.number_input("Amount ($)", min_value=0.0, step=0.01)
+                category = st.selectbox("Category", 
+                    ["Food", "Transportation", "Energy", "Shopping", "Entertainment", "Other"])
+            
+            with col2:
+                date = st.date_input("Date", datetime.now())
+                subcategory = st.text_input("Subcategory (optional)", 
+                    placeholder="e.g., Organic groceries")
+            
+            submitted = st.form_submit_button("Add Transaction")
+            
+            if submitted and description and amount > 0:
+                # Calculate carbon footprint
+                carbon_kg = calculator.calculate_footprint(category, subcategory, amount)
+                
+                # Save transaction
+                transaction = {
+                    'user_id': user_id,
+                    'date': date.isoformat(),
+                    'description': description,
+                    'amount': amount,
+                    'category': category,
+                    'subcategory': subcategory,
+                    'carbon_kg': carbon_kg
+                }
+                
+                db.add_transaction(transaction)
+                st.success(f"Transaction added! Carbon footprint: {carbon_kg:.2f} kg CO₂")
+                st.rerun()
+    
+    with tab2:
+        uploaded_file = st.file_uploader("Upload Bank Statement (CSV)", type=['csv'])
+        
+        if uploaded_file:
+            df = pd.read_csv(uploaded_file)
+            st.write("Preview of uploaded data:")
+            st.dataframe(df.head())
+            
+            if st.button("Process Transactions"):
+                with st.spinner("Processing transactions with AI..."):
+                    processed_transactions = parser.parse_transactions(df, user_id)
+                    
+                    for transaction in processed_transactions:
+                        db.add_transaction(transaction)
+                    
+                    st.success(f"Processed {len(processed_transactions)} transactions!")
+                    st.rerun()
 
-def show_leaderboard():
-    st.header("Leaderboard")
-    top_users = db.get_top_users()
-    st.dataframe(top_users)
+def show_goals_challenges(db, game_engine, user_id):
+    st.title("🎯 Goals & Challenges")
+    
+    # Current goals
+    goals = db.get_user_goals(user_id)
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("Your Goals")
+        
+        if goals:
+            for goal in goals:
+                progress = (goal['current'] / goal['target']) * 100
+                st.write(f"**{goal['title']}**")
+                st.progress(min(progress / 100, 1.0))
+                st.write(f"{goal['current']:.1f} / {goal['target']:.1f} {goal['unit']}")
+                st.write(f"Reward: {goal['reward']}")
+                st.write("---")
+        else:
+            st.info("No active goals. Create one below!")
+        
+        # Create new goal
+        with st.expander("Create New Goal"):
+            goal_type = st.selectbox("Goal Type", 
+                ["Reduce Monthly Footprint", "Use Public Transport", "Plant Trees"])
+            target = st.number_input("Target", min_value=1.0, step=1.0)
+            
+            if st.button("Create Goal"):
+                new_goal = game_engine.create_goal(user_id, goal_type, target)
+                db.add_user_goal(new_goal)
+                st.success("Goal created!")
+                st.rerun()
+    
+    with col2:
+        st.subheader("Weekly Challenges")
+        
+        challenges = game_engine.get_weekly_challenges()
+        
+        for challenge in challenges:
+            with st.container():
+                st.write(f"**{challenge['title']}**")
+                st.write(challenge['description'])
+                st.write(f"Reward: {challenge['reward']} points")
+                
+                if st.button(f"Join Challenge", key=challenge['id']):
+                    game_engine.join_challenge(user_id, challenge['id'])
+                    st.success("Joined challenge!")
+                
+                st.write("---")
+
+def show_leaderboard(db, game_engine):
+    st.title("🏆 Leaderboard")
+    
+    tab1, tab2 = st.tabs(["Global Leaderboard", "Friends"])
+    
+    with tab1:
+        leaderboard = game_engine.get_global_leaderboard()
+        
+        for i, user in enumerate(leaderboard[:10]):
+            col1, col2, col3, col4 = st.columns([1, 3, 2, 2])
+            
+            with col1:
+                if i == 0:
+                    st.write("🥇")
+                elif i == 1:
+                    st.write("🥈")
+                elif i == 2:
+                    st.write("🥉")
+                else:
+                    st.write(f"{i+1}")
+            
+            with col2:
+                st.write(user['username'])
+            
+            with col3:
+                st.write(f"{user['score']:.0f} points")
+            
+            with col4:
+                st.write(f"{user['footprint_reduction']:.1f}% reduction")
+    
+    with tab2:
+        st.info("Connect with friends to see their progress!")
+
+def show_recommendations(db, calculator, user_id):
+    st.title("💡 Green Recommendations")
+    
+    # Get user's transaction patterns
+    transactions = db.get_user_transactions(user_id, days=30)
+    recommendations = calculator.get_recommendations(transactions)
+    
+    for rec in recommendations:
+        with st.container():
+            col1, col2 = st.columns([3, 1])
+            
+            with col1:
+                st.write(f"**{rec['title']}**")
+                st.write(rec['description'])
+                st.write(f"💰 Potential savings: ${rec['cost_savings']:.2f}/month")
+                st.write(f"🌍 Carbon reduction: {rec['carbon_savings']:.1f} kg CO₂/month")
+            
+            with col2:
+                if st.button("Learn More", key=rec['id']):
+                    st.info(rec['details'])
+            
+            st.write("---")
 
 if __name__ == "__main__":
     main()
