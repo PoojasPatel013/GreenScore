@@ -1,142 +1,347 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
-import json
 import time
 import random
-from pathlib import Path
+import json
 
 # Configure page
 st.set_page_config(
-    page_title="🌱 GreenScore Elite",
-    page_icon="🌱",
+    page_title="CarbonTrace | Footprint Tracker",
+    page_icon="🌍",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for regal and modern styling
-def load_custom_css():
+# Simplified CSS with blue neon theme that works with Streamlit
+def load_css():
     st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Inter:wght@300;400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
     
-    .main {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        min-height: 100vh;
-    }
-    
+    /* Global dark theme */
     .stApp {
-        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        background-color: #0a0a0a;
+        color: #ffffff;
     }
     
+    .main .block-container {
+        padding-top: 2rem;
+        max-width: 1200px;
+    }
+    
+    /* Header styling */
+    .carbon-header {
+        background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
+        border: 2px solid #00d4ff;
+        border-radius: 15px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+        text-align: center;
+        box-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
+    }
+    
+    .app-title {
+        font-size: 3rem;
+        font-weight: 700;
+        color: #00d4ff;
+        margin-bottom: 0.5rem;
+        text-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+    }
+    
+    .app-subtitle {
+        font-size: 1.2rem;
+        color: #b0b0b0;
+        margin: 0;
+    }
+    
+    /* Metric cards */
     .metric-card {
-        background: linear-gradient(145deg, #ffffff 0%, #f8f9ff 100%);
-        border-radius: 20px;
-        padding: 25px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-        border: 1px solid rgba(255,255,255,0.2);
-        backdrop-filter: blur(10px);
+        background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
+        border: 1px solid #333;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
         transition: all 0.3s ease;
     }
     
     .metric-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 20px 40px rgba(0,0,0,0.15);
-    }
-    
-    .royal-title {
-        font-family: 'Playfair Display', serif;
-        font-size: 3.5rem;
-        font-weight: 700;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        text-align: center;
-        margin-bottom: 10px;
-        text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
-    }
-    
-    .subtitle {
-        font-family: 'Inter', sans-serif;
-        font-size: 1.2rem;
-        color: #6c757d;
-        text-align: center;
-        margin-bottom: 30px;
-    }
-    
-    .achievement-badge {
-        background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
-        border-radius: 50px;
-        padding: 10px 20px;
-        color: #333;
-        font-weight: 600;
-        display: inline-block;
-        margin: 5px;
-        box-shadow: 0 5px 15px rgba(255,215,0,0.3);
-        animation: pulse 2s infinite;
-    }
-    
-    @keyframes pulse {
-        0% { transform: scale(1); }
-        50% { transform: scale(1.05); }
-        100% { transform: scale(1); }
-    }
-    
-    .level-badge {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 15px 25px;
-        border-radius: 25px;
-        font-weight: 600;
-        text-align: center;
-        box-shadow: 0 8px 25px rgba(102,126,234,0.3);
-    }
-    
-    .challenge-card {
-        background: linear-gradient(145deg, #ffffff 0%, #f8f9ff 100%);
-        border-radius: 15px;
-        padding: 20px;
-        margin: 10px 0;
-        border-left: 5px solid #667eea;
-        box-shadow: 0 5px 15px rgba(0,0,0,0.08);
-        transition: all 0.3s ease;
-    }
-    
-    .challenge-card:hover {
-        transform: translateX(5px);
-        box-shadow: 0 8px 25px rgba(0,0,0,0.12);
-    }
-    
-    .stButton > button {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        border: none;
-        border-radius: 25px;
-        padding: 12px 30px;
-        font-weight: 600;
-        transition: all 0.3s ease;
-        box-shadow: 0 5px 15px rgba(102,126,234,0.3);
-    }
-    
-    .stButton > button:hover {
+        border-color: #00d4ff;
+        box-shadow: 0 0 15px rgba(0, 212, 255, 0.2);
         transform: translateY(-2px);
-        box-shadow: 0 8px 25px rgba(102,126,234,0.4);
     }
     
-    .progress-bar {
-        background: #f8f9fa;
+    .metric-card-blue {
+        border-color: #00d4ff;
+        box-shadow: 0 0 10px rgba(0, 212, 255, 0.1);
+    }
+    
+    .metric-card-red {
+        border-color: #ff4757;
+        box-shadow: 0 0 10px rgba(255, 71, 87, 0.1);
+    }
+    
+    .metric-card-orange {
+        border-color: #ffa502;
+        box-shadow: 0 0 10px rgba(255, 165, 2, 0.1);
+    }
+    
+    .metric-title {
+        font-size: 0.9rem;
+        color: #888;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 0.5rem;
+    }
+    
+    .metric-value {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin: 0.5rem 0;
+    }
+    
+    .metric-value-blue { color: #00d4ff; }
+    .metric-value-red { color: #ff4757; }
+    .metric-value-orange { color: #ffa502; }
+    .metric-value-green { color: #2ed573; }
+    
+    .metric-subtitle {
+        font-size: 0.85rem;
+        color: #666;
+    }
+    
+    /* Activity cards */
+    .activity-card {
+        background: #1a1a1a;
+        border: 1px solid #333;
         border-radius: 10px;
+        padding: 1rem;
+        margin-bottom: 0.8rem;
+        transition: all 0.3s ease;
+    }
+    
+    .activity-card:hover {
+        border-color: #00d4ff;
+        box-shadow: 0 0 10px rgba(0, 212, 255, 0.1);
+    }
+    
+    .activity-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #ffffff;
+        margin-bottom: 0.3rem;
+    }
+    
+    .activity-meta {
+        font-size: 0.85rem;
+        color: #888;
+        margin-bottom: 0.5rem;
+    }
+    
+    .activity-values {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .activity-amount {
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: #00d4ff;
+    }
+    
+    .activity-carbon {
+        font-size: 1rem;
+        font-weight: 600;
+        color: #ff4757;
+    }
+    
+    /* Badges */
+    .badge {
+        display: inline-block;
+        padding: 0.2rem 0.6rem;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .badge-blue {
+        background: rgba(0, 212, 255, 0.2);
+        color: #00d4ff;
+        border: 1px solid #00d4ff;
+    }
+    
+    .badge-red {
+        background: rgba(255, 71, 87, 0.2);
+        color: #ff4757;
+        border: 1px solid #ff4757;
+    }
+    
+    .badge-orange {
+        background: rgba(255, 165, 2, 0.2);
+        color: #ffa502;
+        border: 1px solid #ffa502;
+    }
+    
+    .badge-green {
+        background: rgba(46, 213, 115, 0.2);
+        color: #2ed573;
+        border: 1px solid #2ed573;
+    }
+    
+    /* Progress bars */
+    .progress-container {
+        background: #333;
+        border-radius: 8px;
         height: 8px;
+        margin: 1rem 0;
         overflow: hidden;
     }
     
-    .progress-fill {
+    .progress-bar {
         height: 100%;
-        border-radius: 10px;
-        transition: width 1s ease-in-out;
+        background: linear-gradient(90deg, #00d4ff, #0099cc);
+        border-radius: 8px;
+        transition: width 1s ease;
     }
+    
+    /* Challenge cards */
+    .challenge-card {
+        background: #1a1a1a;
+        border: 1px solid #00d4ff;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 0 15px rgba(0, 212, 255, 0.1);
+    }
+    
+    .challenge-title {
+        font-size: 1.3rem;
+        font-weight: 600;
+        color: #ffffff;
+        margin-bottom: 0.5rem;
+    }
+    
+    .challenge-description {
+        color: #b0b0b0;
+        margin-bottom: 1rem;
+        line-height: 1.5;
+    }
+    
+    .challenge-progress {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #00d4ff;
+        text-align: right;
+    }
+    
+    .challenge-reward {
+        color: #00d4ff;
+        font-weight: 500;
+        margin-top: 1rem;
+    }
+    
+    /* Leaderboard */
+    .leaderboard-card {
+        background: #1a1a1a;
+        border: 1px solid #333;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 1.5rem;
+        transition: all 0.3s ease;
+    }
+    
+    .leaderboard-card:hover {
+        border-color: #00d4ff;
+        box-shadow: 0 0 15px rgba(0, 212, 255, 0.1);
+    }
+    
+    .leaderboard-card.user-card {
+        border-color: #00d4ff;
+        box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
+    }
+    
+    .rank-number {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #00d4ff;
+        min-width: 60px;
+        text-align: center;
+    }
+    
+    .user-info {
+        flex: 1;
+    }
+    
+    .username {
+        font-size: 1.3rem;
+        font-weight: 600;
+        color: #ffffff;
+        margin-bottom: 0.3rem;
+    }
+    
+    .user-stats {
+        color: #888;
+        font-size: 0.9rem;
+    }
+    
+    .user-score {
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: #00d4ff;
+        text-align: right;
+        min-width: 120px;
+    }
+    
+    /* Tabs */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 1rem;
+        background: #1a1a1a;
+        border-radius: 10px;
+        padding: 0.5rem;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        background: transparent;
+        border-radius: 8px;
+        color: #888;
+        border: none;
+    }
+    
+    .stTabs [aria-selected="true"] {
+        background: #00d4ff !important;
+        color: #000000 !important;
+    }
+    
+    /* Buttons */
+    .stButton > button {
+        background: linear-gradient(45deg, #00d4ff, #0099cc);
+        border: none;
+        border-radius: 8px;
+        color: #000000;
+        font-weight: 600;
+        padding: 0.6rem 1.2rem;
+        width: 100%;
+        margin-bottom: 0.5rem;
+    }
+    
+    .stButton > button:hover {
+        background: linear-gradient(45deg, #0099cc, #00d4ff);
+        transform: translateY(-1px);
+    }
+    
+    /* Hide Streamlit elements */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
 
@@ -144,50 +349,51 @@ def load_custom_css():
 def init_session_state():
     if 'user_data' not in st.session_state:
         st.session_state.user_data = {
-            'user_id': 'elite_user_001',
-            'username': 'EcoRoyalty',
-            'level': 'Carbon Crusader',
+            'user_id': 'carbon_tracker_001',
+            'username': 'EcoWarrior',
+            'level': 'Carbon Conscious',
             'score': 8750,
-            'trees_planted': 23,
-            'co2_saved': 1247.5,
-            'streak_days': 15,
-            'achievements': ['First Steps', 'Week Warrior', 'Tree Planter', 'Carbon Saver'],
-            'rank': 3
+            'co2_saved': 1247.8,
+            'trees_equivalent': 56,
+            'streak_days': 23,
+            'rank': 3,
+            'monthly_target': 500,
+            'current_month': 347.2
         }
-    
+
     if 'transactions' not in st.session_state:
         st.session_state.transactions = generate_sample_transactions()
-    
+
     if 'challenges' not in st.session_state:
         st.session_state.challenges = generate_challenges()
 
 def generate_sample_transactions():
-    """Generate realistic sample transactions"""
+    """Generate sample carbon footprint transactions"""
     categories = {
         'Transportation': {
-            'items': ['Uber ride downtown', 'Gas station fill-up', 'Metro card refill', 'Taxi to airport', 'Bus pass'],
-            'carbon_range': (5, 45),
-            'amount_range': (15, 120)
-        },
-        'Food': {
-            'items': ['Whole Foods grocery', 'Local farmers market', 'Restaurant dinner', 'Coffee shop', 'Organic produce'],
-            'carbon_range': (3, 25),
-            'amount_range': (8, 150)
+            'items': ['Uber ride downtown', 'Gas station fill-up', 'Flight to NYC', 'Metro card refill', 'Electric scooter rental'],
+            'carbon_range': (2, 85),
+            'amount_range': (5, 450)
         },
         'Energy': {
-            'items': ['Electricity bill', 'Gas utility bill', 'Solar panel payment', 'Energy efficient appliance'],
-            'carbon_range': (20, 80),
-            'amount_range': (50, 300)
+            'items': ['Electricity bill', 'Gas heating', 'Solar panel credit', 'Smart thermostat savings'],
+            'carbon_range': (15, 120),
+            'amount_range': (80, 350)
+        },
+        'Food': {
+            'items': ['Grocery shopping', 'Restaurant dinner', 'Local farmers market', 'Meal delivery', 'Coffee shop'],
+            'carbon_range': (1, 35),
+            'amount_range': (8, 120)
         },
         'Shopping': {
-            'items': ['Amazon electronics', 'Local bookstore', 'Sustainable clothing', 'Refurbished laptop'],
-            'carbon_range': (8, 35),
-            'amount_range': (25, 500)
+            'items': ['Online purchase', 'Electronics store', 'Clothing retail', 'Local bookstore', 'Hardware store'],
+            'carbon_range': (3, 45),
+            'amount_range': (15, 300)
         }
     }
-    
+
     transactions = []
-    for i in range(30):
+    for i in range(25):
         category = random.choice(list(categories.keys()))
         item_data = categories[category]
         
@@ -198,536 +404,616 @@ def generate_sample_transactions():
             'category': category,
             'amount': round(random.uniform(*item_data['amount_range']), 2),
             'carbon_kg': round(random.uniform(*item_data['carbon_range']), 1),
-            'eco_score': random.randint(1, 10)
+            'impact_level': random.choice(['Low', 'Medium', 'High'])
         }
         transactions.append(transaction)
-    
+
     return sorted(transactions, key=lambda x: x['date'], reverse=True)
 
 def generate_challenges():
-    """Generate weekly challenges"""
+    """Generate carbon reduction challenges"""
     return [
         {
             'id': 1,
-            'title': '🚌 Public Transport Champion',
-            'description': 'Use public transportation 5 times this week',
-            'progress': 60,
-            'target': 5,
-            'current': 3,
-            'reward': '500 EcoPoints + Transport Badge',
+            'title': '🚗 Zero Emission Week',
+            'description': 'Use only public transport, walking, or cycling for 7 days',
+            'progress': 71,
+            'target': 7,
+            'current': 5,
+            'reward': '500 EcoPoints + Green Commuter Badge',
             'difficulty': 'Medium',
-            'expires': '3 days'
+            'expires': '4 days left'
         },
         {
             'id': 2,
-            'title': '🌱 Plant-Based Pioneer',
-            'description': 'Choose 8 plant-based meals this week',
-            'progress': 75,
-            'target': 8,
+            'title': '🌱 Plant-Based Power',
+            'description': 'Eat 10 plant-based meals this week',
+            'progress': 60,
+            'target': 10,
             'current': 6,
-            'reward': '750 EcoPoints + Veggie Crown',
+            'reward': '300 EcoPoints + Herbivore Hero Badge',
             'difficulty': 'Easy',
-            'expires': '5 days'
+            'expires': '6 days left'
         },
         {
             'id': 3,
-            'title': '⚡ Energy Efficiency Expert',
-            'description': 'Reduce energy consumption by 25%',
-            'progress': 40,
+            'title': '⚡ Energy Efficiency Master',
+            'description': 'Reduce home energy consumption by 25%',
+            'progress': 45,
             'target': 25,
-            'current': 10,
-            'reward': '1000 EcoPoints + Energy Master Badge',
+            'current': 11,
+            'reward': '750 EcoPoints + Energy Saver Title',
             'difficulty': 'Hard',
-            'expires': '6 days'
-        },
-        {
-            'id': 4,
-            'title': '🛒 Local Shopping Hero',
-            'description': 'Make 4 purchases from local businesses',
-            'progress': 25,
-            'target': 4,
-            'current': 1,
-            'reward': '400 EcoPoints + Community Champion',
-            'difficulty': 'Medium',
-            'expires': '4 days'
+            'expires': '2 weeks left'
         }
     ]
 
-def create_animated_metric(title, value, delta, icon, color):
-    """Create animated metric cards"""
+def create_metric_card(title, value, subtitle, color, icon):
+    """Create metric cards with proper styling"""
     st.markdown(f"""
-    <div class="metric-card">
-        <div style="display: flex; align-items: center; margin-bottom: 10px;">
-            <span style="font-size: 2rem; margin-right: 15px;">{icon}</span>
-            <span style="font-family: 'Inter', sans-serif; font-weight: 600; color: #6c757d;">{title}</span>
+    <div class="metric-card metric-card-{color}">
+        <div class="metric-title">
+            {icon} {title}
         </div>
-        <div style="font-size: 2.5rem; font-weight: 700; color: {color}; margin-bottom: 5px;">
+        <div class="metric-value metric-value-{color}">
             {value}
         </div>
-        <div style="font-size: 0.9rem; color: #28a745; font-weight: 500;">
-            {delta}
+        <div class="metric-subtitle">
+            {subtitle}
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-def create_progress_ring(percentage, size=120, color="#667eea"):
-    """Create animated circular progress ring"""
-    circumference = 2 * 3.14159 * (size/2 - 10)
-    stroke_dasharray = circumference
-    stroke_dashoffset = circumference - (percentage / 100) * circumference
+def create_progress_circle(percentage, title, color="blue"):
+    """Create simple progress circles using Plotly"""
+    fig = go.Figure(go.Indicator(
+        mode = "gauge+number",
+        value = percentage,
+        domain = {'x': [0, 1], 'y': [0, 1]},
+        title = {'text': title, 'font': {'color': '#ffffff', 'size': 16}},
+        number = {'font': {'color': '#00d4ff', 'size': 24}},
+        gauge = {
+            'axis': {'range': [None, 100], 'tickcolor': '#666'},
+            'bar': {'color': '#00d4ff'},
+            'bgcolor': '#1a1a1a',
+            'borderwidth': 2,
+            'bordercolor': '#333',
+            'steps': [{'range': [0, 100], 'color': '#333'}],
+            'threshold': {
+                'line': {'color': '#00d4ff', 'width': 4},
+                'thickness': 0.75,
+                'value': percentage
+            }
+        }
+    ))
     
-    return f"""
-    <div style="display: flex; justify-content: center; align-items: center;">
-        <svg width="{size}" height="{size}" style="transform: rotate(-90deg);">
-            <circle cx="{size/2}" cy="{size/2}" r="{size/2 - 10}" 
-                    fill="transparent" stroke="#e6e6e6" stroke-width="8"/>
-            <circle cx="{size/2}" cy="{size/2}" r="{size/2 - 10}" 
-                    fill="transparent" stroke="{color}" stroke-width="8"
-                    stroke-dasharray="{stroke_dasharray}"
-                    stroke-dashoffset="{stroke_dashoffset}"
-                    style="transition: stroke-dashoffset 2s ease-in-out;"/>
-            <text x="{size/2}" y="{size/2 + 5}" text-anchor="middle" 
-                  style="font-size: 1.2rem; font-weight: 600; fill: {color}; transform: rotate(90deg); transform-origin: {size/2}px {size/2}px;">
-                {percentage:.0f}%
-            </text>
-        </svg>
-    </div>
-    """
+    fig.update_layout(
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        font={'color': '#ffffff'},
+        height=200,
+        margin=dict(l=20, r=20, t=40, b=20)
+    )
+    
+    return fig
 
 def main():
-    load_custom_css()
+    load_css()
     init_session_state()
-    
-    # Header
-    st.markdown('<h1 class="royal-title">🌱 GreenScore Elite</h1>', unsafe_allow_html=True)
-    st.markdown('<p class="subtitle">Your Royal Path to Carbon Neutrality</p>', unsafe_allow_html=True)
-    
-    # User level and achievements
-    user_data = st.session_state.user_data
-    
-    col1, col2, col3 = st.columns([2, 3, 2])
-    with col2:
-        st.markdown(f"""
-        <div class="level-badge">
-            👑 {user_data['level']} - Rank #{user_data['rank']}
-            <br>
-            <small>Streak: {user_data['streak_days']} days 🔥</small>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    # Achievement badges
-    st.markdown("### 🏆 Your Royal Achievements")
-    achievement_html = ""
-    for achievement in user_data['achievements']:
-        achievement_html += f'<span class="achievement-badge">🏅 {achievement}</span>'
-    st.markdown(achievement_html, unsafe_allow_html=True)
-    
-    st.markdown("---")
-    
-    # Navigation
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        "🏰 Royal Dashboard", 
-        "💳 Transaction Vault", 
-        "🎯 Noble Quests", 
-        "👑 Leaderboard", 
-        "🎁 Royal Rewards"
-    ])
-    
-    with tab1:
-        show_royal_dashboard()
-    
-    with tab2:
-        show_transaction_vault()
-    
-    with tab3:
-        show_noble_quests()
-    
-    with tab4:
-        show_leaderboard()
-    
-    with tab5:
-        show_royal_rewards()
 
-def show_royal_dashboard():
-    st.markdown("## 🏰 Your Royal Environmental Kingdom")
-    
+    # Header
+    st.markdown("""
+    <div class="carbon-header">
+        <h1 class="app-title">🌍 CARBONTRACE</h1>
+        <p class="app-subtitle">Track • Reduce • Impact • Transform</p>
+    </div>
+    """, unsafe_allow_html=True)
+
     user_data = st.session_state.user_data
-    
-    # Key metrics with animations
+
+    # Main metrics
     col1, col2, col3, col4 = st.columns(4)
-    
+
     with col1:
-        create_animated_metric(
-            "Royal Score", 
-            f"{user_data['score']:,}", 
-            "+125 this week", 
-            "👑", 
-            "#667eea"
+        create_metric_card(
+            "Carbon Footprint", 
+            f"{user_data['current_month']:.1f} kg", 
+            f"Target: {user_data['monthly_target']} kg/month", 
+            "red", 
+            "🔥"
         )
-    
+
     with col2:
-        create_animated_metric(
+        create_metric_card(
             "CO₂ Saved", 
             f"{user_data['co2_saved']:.1f} kg", 
-            "+23.5 kg this week", 
-            "🌍", 
-            "#28a745"
+            "↗ +89.3 kg this month", 
+            "green", 
+            "🌱"
         )
-    
+
     with col3:
-        create_animated_metric(
-            "Trees Planted", 
-            str(user_data['trees_planted']), 
-            "+2 this month", 
-            "🌳", 
-            "#20c997"
+        create_metric_card(
+            "EcoScore", 
+            f"{user_data['score']:,}", 
+            f"Rank #{user_data['rank']} globally", 
+            "blue", 
+            "⭐"
         )
-    
+
     with col4:
-        create_animated_metric(
-            "Eco Impact", 
-            "Excellent", 
-            "Top 5% globally", 
-            "⭐", 
-            "#ffc107"
+        create_metric_card(
+            "Tree Equivalent", 
+            str(user_data['trees_equivalent']), 
+            f"{user_data['streak_days']} day streak", 
+            "orange", 
+            "🌳"
         )
-    
+
     st.markdown("---")
+
+    # Navigation tabs
+    tab1, tab2, tab3, tab4 = st.tabs([
+        "🏠 Dashboard", 
+        "📊 Analytics", 
+        "🎯 Challenges", 
+        "🌍 Eco Impact"
+    ])
+
+    with tab1:
+        show_dashboard()
+
+    with tab2:
+        show_analytics()
+
+    with tab3:
+        show_challenges()
+
+    with tab4:
+        show_eco_impact()
+
+def show_dashboard():
+    st.markdown("## 🏠 Carbon Footprint Dashboard")
+
+    user_data = st.session_state.user_data
+
+    # Progress circles
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        monthly_progress = (user_data['current_month'] / user_data['monthly_target']) * 100
+        fig1 = create_progress_circle(min(monthly_progress, 100), "Monthly Target")
+        st.plotly_chart(fig1, use_container_width=True)
+
+    with col2:
+        reduction_progress = 78
+        fig2 = create_progress_circle(reduction_progress, "Reduction Goal")
+        st.plotly_chart(fig2, use_container_width=True)
+
+    with col3:
+        efficiency_score = 85
+        fig3 = create_progress_circle(efficiency_score, "Efficiency Score")
+        st.plotly_chart(fig3, use_container_width=True)
+
+    st.markdown("---")
+
+    # Recent transactions and quick actions
+    col1, col2 = st.columns([2, 1])
+
+    with col1:
+        st.markdown("### 📋 Recent Carbon Activities")
+        
+        transactions = st.session_state.transactions[:8]
+        
+        for transaction in transactions:
+            impact_colors = {'Low': 'green', 'Medium': 'orange', 'High': 'red'}
+            color = impact_colors.get(transaction['impact_level'], 'blue')
+            
+            st.markdown(f"""
+            <div class="activity-card">
+                <div class="activity-title">{transaction['description']}</div>
+                <div class="activity-meta">
+                    📅 {transaction['date']} • 📂 {transaction['category']}
+                </div>
+                <div class="activity-values">
+                    <div>
+                        <span class="badge badge-{color}">{transaction['impact_level']} Impact</span>
+                    </div>
+                    <div>
+                        <div class="activity-amount">${transaction['amount']:.2f}</div>
+                        <div class="activity-carbon">{transaction['carbon_kg']} kg CO₂</div>
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+    with col2:
+        st.markdown("### 🎯 Quick Actions")
+        
+        if st.button("📱 Log New Activity"):
+            st.success("🎉 Activity logging opened!")
+        
+        if st.button("📊 Generate Report"):
+            st.info("📈 Generating your carbon report...")
+        
+        if st.button("🌱 Offset Carbon"):
+            st.success("🌍 Carbon offset marketplace opened!")
+        
+        if st.button("🏆 View Achievements"):
+            st.info("🏅 Achievement gallery loaded!")
+
+        st.markdown("---")
+        
+        st.markdown("### 💡 AI Insights")
+        
+        insights = [
+            {
+                'icon': '🚗',
+                'title': 'Transportation Alert',
+                'message': 'Your transport emissions are 23% above average. Consider carpooling or public transit.',
+                'color': 'red'
+            },
+            {
+                'icon': '⚡',
+                'title': 'Energy Efficiency',
+                'message': 'Great job! Your energy usage is 15% below target this month.',
+                'color': 'green'
+            },
+            {
+                'icon': '🍃',
+                'title': 'Eco Tip',
+                'message': 'Switching to LED bulbs could save 45kg CO₂ annually.',
+                'color': 'blue'
+            }
+        ]
+        
+        for insight in insights:
+            st.markdown(f"""
+            <div class="activity-card">
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                    <span style="font-size: 2rem;">{insight['icon']}</span>
+                    <div>
+                        <div class="activity-title">{insight['title']}</div>
+                        <div style="color: #b0b0b0; font-size: 0.9rem; line-height: 1.4;">
+                            {insight['message']}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+def show_analytics():
+    st.markdown("## 📊 Carbon Analytics")
+
+    # Generate sample data for charts
+    dates = [(datetime.now() - timedelta(days=i)).strftime('%Y-%m-%d') for i in range(30, 0, -1)]
+    carbon_values = [random.uniform(8, 25) for _ in dates]
     
-    # Progress rings and charts
+    # Carbon trend chart
+    fig_trend = go.Figure()
+    
+    fig_trend.add_trace(go.Scatter(
+        x=dates,
+        y=carbon_values,
+        mode='lines+markers',
+        name='Daily Carbon Footprint',
+        line=dict(color='#00d4ff', width=3),
+        marker=dict(color='#00d4ff', size=6),
+        fill='tonexty',
+        fillcolor='rgba(0, 212, 255, 0.1)'
+    ))
+    
+    fig_trend.update_layout(
+        title='Daily Carbon Footprint Trend',
+        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(0,0,0,0)',
+        font=dict(color="#ffffff"),
+        title_font=dict(size=18, color="#00d4ff"),
+        xaxis=dict(gridcolor='#333'),
+        yaxis=dict(gridcolor='#333', title='CO₂ (kg)'),
+        height=400
+    )
+    
+    st.plotly_chart(fig_trend, use_container_width=True)
+
+    # Category breakdown
     col1, col2 = st.columns(2)
     
     with col1:
-        st.markdown("### 📊 Weekly Progress Rings")
+        categories = ['Transportation', 'Energy', 'Food', 'Shopping']
+        values = [45, 30, 15, 10]
+        colors = ['#ff4757', '#ffa502', '#2ed573', '#00d4ff']
         
-        subcol1, subcol2, subcol3 = st.columns(3)
+        fig_pie = go.Figure(data=[go.Pie(
+            labels=categories,
+            values=values,
+            hole=0.4,
+            marker=dict(colors=colors, line=dict(color='#000000', width=2))
+        )])
         
-        with subcol1:
-            st.markdown("**Transport**")
-            st.markdown(create_progress_ring(75, 100, "#667eea"), unsafe_allow_html=True)
-        
-        with subcol2:
-            st.markdown("**Energy**")
-            st.markdown(create_progress_ring(60, 100, "#28a745"), unsafe_allow_html=True)
-        
-        with subcol3:
-            st.markdown("**Food**")
-            st.markdown(create_progress_ring(85, 100, "#20c997"), unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown("### 📈 Carbon Footprint Trend")
-        
-        # Generate trend data
-        dates = [(datetime.now() - timedelta(days=i)).strftime('%Y-%m-%d') for i in range(30, 0, -1)]
-        carbon_values = [random.uniform(15, 45) for _ in dates]
-        
-        df_trend = pd.DataFrame({
-            'Date': dates,
-            'Carbon (kg)': carbon_values
-        })
-        
-        fig = px.line(df_trend, x='Date', y='Carbon (kg)', 
-                     title="Daily Carbon Footprint",
-                     color_discrete_sequence=['#667eea'])
-        fig.update_layout(
+        fig_pie.update_layout(
+            title='Carbon Footprint by Category',
             plot_bgcolor='rgba(0,0,0,0)',
             paper_bgcolor='rgba(0,0,0,0)',
-            font=dict(family="Inter, sans-serif")
+            font=dict(color="#ffffff"),
+            title_font=dict(size=16, color="#00d4ff"),
+            height=350
         )
-        st.plotly_chart(fig, use_container_width=True)
-
-def show_transaction_vault():
-    st.markdown("## 💳 Royal Transaction Vault")
-    
-    # Add new transaction form
-    with st.expander("➕ Add New Royal Transaction", expanded=False):
-        col1, col2 = st.columns(2)
         
-        with col1:
-            description = st.text_input("Description", placeholder="Royal grocery shopping")
-            amount = st.number_input("Amount ($)", min_value=0.0, step=0.01)
-            category = st.selectbox("Category", 
-                ["Transportation", "Food", "Energy", "Shopping", "Entertainment"])
-        
-        with col2:
-            date = st.date_input("Date", datetime.now())
-            eco_friendly = st.checkbox("Eco-friendly choice")
-            
-        if st.button("🏰 Add to Royal Vault"):
-            if description and amount > 0:
-                # Calculate carbon footprint (simplified)
-                carbon_factors = {
-                    "Transportation": 0.4,
-                    "Food": 0.3,
-                    "Energy": 0.6,
-                    "Shopping": 0.2,
-                    "Entertainment": 0.1
-                }
-                
-                carbon_kg = amount * carbon_factors.get(category, 0.3)
-                if eco_friendly:
-                    carbon_kg *= 0.5  # 50% reduction for eco-friendly choices
-                
-                new_transaction = {
-                    'id': len(st.session_state.transactions) + 1,
-                    'date': date.strftime('%Y-%m-%d'),
-                    'description': description,
-                    'category': category,
-                    'amount': amount,
-                    'carbon_kg': round(carbon_kg, 1),
-                    'eco_score': 9 if eco_friendly else random.randint(3, 7)
-                }
-                
-                st.session_state.transactions.insert(0, new_transaction)
-                st.success(f"✨ Transaction added! Carbon footprint: {carbon_kg:.1f} kg CO₂")
-                time.sleep(1)
-                st.rerun()
-    
-    # Recent transactions
-    st.markdown("### 📋 Recent Royal Transactions")
-    
-    transactions = st.session_state.transactions[:10]
-    
-    for transaction in transactions:
-        eco_color = "#28a745" if transaction['eco_score'] >= 7 else "#ffc107" if transaction['eco_score'] >= 4 else "#dc3545"
-        
-        with st.container():
-            col1, col2 = st.columns([3, 1])
-            
-            with col1:
-                st.write(f"**{transaction['description']}**")
-                st.write(f"*{transaction['date']} • {transaction['category']}*")
-            
-            with col2:
-                st.write(f"**${transaction['amount']:.2f}**")
-                st.write(f"🌍 {transaction['carbon_kg']} kg CO₂")
-                st.markdown(f"<span style='color: {eco_color}'>Eco Score: {transaction['eco_score']}/10</span>", 
-                           unsafe_allow_html=True)
-            
-            st.markdown("---")
-
-def show_noble_quests():
-    st.markdown("## 🎯 Noble Environmental Quests")
-    
-    challenges = st.session_state.challenges
-    
-    # Challenge statistics
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        active_challenges = len([c for c in challenges if c['progress'] < 100])
-        create_animated_metric("Active Quests", str(active_challenges), "4 new this week", "⚔️", "#667eea")
+        st.plotly_chart(fig_pie, use_container_width=True)
     
     with col2:
-        completed = len([c for c in challenges if c['progress'] >= 100])
-        create_animated_metric("Completed", str(completed), "+2 this week", "✅", "#28a745")
-    
-    with col3:
-        total_rewards = sum([500, 750, 1000, 400])  # Sample rewards
-        create_animated_metric("Total Rewards", f"{total_rewards:,}", "EcoPoints earned", "💎", "#ffc107")
-    
-    with col4:
-        avg_progress = sum([c['progress'] for c in challenges]) / len(challenges)
-        create_animated_metric("Avg Progress", f"{avg_progress:.0f}%", "Excellent pace", "📈", "#20c997")
-    
-    st.markdown("---")
-    
-    # Challenge cards using Streamlit components
+        months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun']
+        emissions = [420, 380, 350, 320, 290, 347]
+        
+        fig_bar = go.Figure(data=[go.Bar(
+            x=months,
+            y=emissions,
+            marker=dict(
+                color='#00d4ff',
+                line=dict(color='#ffffff', width=1)
+            )
+        )])
+        
+        fig_bar.update_layout(
+            title='Monthly Carbon Emissions',
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            font=dict(color="#ffffff"),
+            title_font=dict(size=16, color="#00d4ff"),
+            xaxis=dict(gridcolor='#333'),
+            yaxis=dict(gridcolor='#333', title='CO₂ (kg)'),
+            height=350
+        )
+        
+        st.plotly_chart(fig_bar, use_container_width=True)
+
+def show_challenges():
+    st.markdown("## 🎯 Carbon Reduction Challenges")
+
+    challenges = st.session_state.challenges
+
     for challenge in challenges:
-        difficulty_colors = {
-            'Easy': '#28a745',
-            'Medium': '#ffc107', 
-            'Hard': '#dc3545'
-        }
+        # Create columns for better layout
+        col1, col2 = st.columns([3, 1])
         
-        difficulty_color = difficulty_colors.get(challenge['difficulty'], '#6c757d')
-        progress_color = "#28a745" if challenge['progress'] >= 75 else "#ffc107" if challenge['progress'] >= 50 else "#dc3545"
-        
-        with st.container():
-            # Challenge header
-            col1, col2 = st.columns([3, 1])
-            
-            with col1:
-                st.markdown(f"### {challenge['title']}")
-                st.write(challenge['description'])
-                
-                # Difficulty and expiry badges
-                col_a, col_b = st.columns(2)
-                with col_a:
-                    st.markdown(f"<span style='background: {difficulty_color}; color: white; padding: 4px 12px; border-radius: 15px; font-size: 0.8rem; font-weight: 600;'>{challenge['difficulty']}</span>", 
-                               unsafe_allow_html=True)
-                with col_b:
-                    st.write(f"⏰ Expires in {challenge['expires']}")
-            
-            with col2:
-                st.metric("Progress", f"{challenge['progress']}%", f"{challenge['current']}/{challenge['target']}")
-            
-            # Progress bar
-            progress_width = challenge['progress']
+        with col1:
             st.markdown(f"""
-            <div class="progress-bar">
-                <div class="progress-fill" style="width: {progress_width}%; background: linear-gradient(90deg, {progress_color}, {progress_color}aa);"></div>
+            <div style="
+                background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
+                border: 1px solid #00d4ff;
+                border-radius: 12px;
+                padding: 1.5rem;
+                margin-bottom: 1rem;
+                box-shadow: 0 0 15px rgba(0, 212, 255, 0.1);
+            ">
+                <h3 style="color: #ffffff; margin: 0 0 0.5rem 0; font-size: 1.3rem;">
+                    {challenge['title']}
+                </h3>
+                <p style="color: #b0b0b0; margin: 0 0 1rem 0; line-height: 1.5;">
+                    {challenge['description']}
+                </p>
+                <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+                    <span style="
+                        background: rgba(0, 212, 255, 0.2);
+                        color: #00d4ff;
+                        border: 1px solid #00d4ff;
+                        padding: 0.2rem 0.6rem;
+                        border-radius: 12px;
+                        font-size: 0.75rem;
+                        font-weight: 500;
+                        text-transform: uppercase;
+                    ">{challenge['difficulty']}</span>
+                    <span style="color: #888; font-size: 0.9rem;">⏰ {challenge['expires']}</span>
+                </div>
+                <div style="
+                    background: #333;
+                    border-radius: 8px;
+                    height: 8px;
+                    margin: 1rem 0;
+                    overflow: hidden;
+                ">
+                    <div style="
+                        height: 100%;
+                        background: linear-gradient(90deg, #00d4ff, #0099cc);
+                        border-radius: 8px;
+                        width: {challenge['progress']}%;
+                        transition: width 1s ease;
+                    "></div>
+                </div>
+                <div style="color: #00d4ff; font-weight: 500;">
+                    🎁 Reward: {challenge['reward']}
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col2:
+            st.markdown(f"""
+            <div style="
+                background: #1a1a1a;
+                border: 1px solid #333;
+                border-radius: 12px;
+                padding: 1.5rem;
+                text-align: center;
+                margin-bottom: 1rem;
+                height: fit-content;
+            ">
+                <div style="
+                    font-size: 2.5rem;
+                    font-weight: 700;
+                    color: #00d4ff;
+                    margin-bottom: 0.5rem;
+                ">{challenge['progress']}%</div>
+                <div style="color: #888; font-size: 0.9rem; margin-bottom: 1rem;">
+                    {challenge['current']}/{challenge['target']} completed
+                </div>
             </div>
             """, unsafe_allow_html=True)
             
-            # Reward and action
-            col1, col2 = st.columns([2, 1])
-            with col1:
-                st.write(f"🎁 **Reward:** {challenge['reward']}")
-            
-            with col2:
-                if challenge['progress'] >= 100:
-                    if st.button("🏆 Claim Reward", key=f"claim_{challenge['id']}"):
-                        st.success("Reward claimed! 🎉")
-                else:
-                    if st.button("⚡ Continue Quest", key=f"continue_{challenge['id']}"):
-                        st.info("Keep up the great work! 💪")
-            
-            st.markdown("---")
+            if challenge['progress'] >= 100:
+                if st.button("🏆 Claim Reward", key=f"claim_{challenge['id']}", use_container_width=True):
+                    st.success("🎉 Reward claimed successfully!")
+            else:
+                if st.button("⚡ Continue", key=f"continue_{challenge['id']}", use_container_width=True):
+                    st.info("💪 Keep up the great work!")
 
-def show_leaderboard():
-    st.markdown("## 👑 Royal Leaderboard")
+def show_eco_impact():
+    st.markdown("## 🌍 Your Eco Impact & Achievements")
     
-    # Generate leaderboard data
-    leaderboard_data = [
-        {'rank': 1, 'username': 'EcoEmperor', 'score': 12450, 'level': 'Planet Protector', 'streak': 45, 'country': '🇺🇸'},
-        {'rank': 2, 'username': 'GreenGoddess', 'score': 11800, 'level': 'Carbon Crusher', 'streak': 38, 'country': '🇨🇦'},
-        {'rank': 3, 'username': 'EcoRoyalty', 'score': 8750, 'level': 'Carbon Crusader', 'streak': 15, 'country': '🇺🇸'},  # User
-        {'rank': 4, 'username': 'SustainabilityKing', 'score': 8200, 'level': 'Green Warrior', 'streak': 22, 'country': '🇬🇧'},
-        {'rank': 5, 'username': 'ClimateChampion', 'score': 7950, 'level': 'Green Warrior', 'streak': 31, 'country': '🇩🇪'},
+    # Achievement badges section
+    st.markdown("### 🏅 Achievement Gallery")
+    
+    achievements = [
+        {'name': 'First Steps', 'icon': '👶', 'description': 'Started your carbon tracking journey', 'earned': True, 'rarity': 'Common'},
+        {'name': 'Week Warrior', 'icon': '⚡', 'description': 'Completed 7 days of tracking', 'earned': True, 'rarity': 'Common'},
+        {'name': 'Carbon Crusher', 'icon': '💪', 'description': 'Reduced emissions by 25%', 'earned': True, 'rarity': 'Rare'},
+        {'name': 'Tree Hugger', 'icon': '🌳', 'description': 'Offset equivalent to 50 trees', 'earned': True, 'rarity': 'Epic'},
+        {'name': 'Green Machine', 'icon': '🤖', 'description': 'Automated 10 eco-friendly habits', 'earned': False, 'rarity': 'Legendary'},
+        {'name': 'Planet Protector', 'icon': '🛡️', 'description': 'Saved 1000kg of CO₂', 'earned': False, 'rarity': 'Legendary'},
     ]
     
-    # Leaderboard stats
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        create_animated_metric("Your Rank", "#3", "↑2 this week", "👑", "#667eea")
-    
-    with col2:
-        create_animated_metric("Global Players", "50,247", "+1,234 today", "🌍", "#28a745")
-    
-    with col3:
-        create_animated_metric("Your Percentile", "Top 6%", "Elite status", "⭐", "#ffc107")
+    # Display achievements in a grid using columns
+    cols = st.columns(3)
+    for i, achievement in enumerate(achievements):
+        with cols[i % 3]:
+            if achievement['earned']:
+                st.success(f"{achievement['icon']} **{achievement['name']}**")
+                st.caption(f"{achievement['description']} • {achievement['rarity']}")
+            else:
+                st.info(f"🔒 **{achievement['name']}**")
+                st.caption(f"{achievement['description']} • {achievement['rarity']}")
     
     st.markdown("---")
     
-    # Leaderboard display
-    for player in leaderboard_data:
-        is_user = player['username'] == 'EcoRoyalty'
+    # Environmental impact visualization using Streamlit metrics
+    st.markdown("### 🌱 Your Environmental Impact")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("#### 🌍 Real-World Impact")
         
-        crown_emoji = "👑" if player['rank'] == 1 else "🥈" if player['rank'] == 2 else "🥉" if player['rank'] == 3 else "🏅"
+        # Use Streamlit metrics for clean display
+        st.metric(
+            label="🚗 Car Miles Saved",
+            value="3,247 miles",
+            help="Equivalent to driving from NYC to Los Angeles"
+        )
         
-        with st.container():
-            col1, col2, col3 = st.columns([1, 3, 1])
-            
-            with col1:
-                st.markdown(f"## {crown_emoji}")
-                st.markdown(f"**#{player['rank']}**")
-            
-            with col2:
-                if is_user:
-                    st.markdown(f"### {player['country']} {player['username']} 👑 (You)")
-                else:
-                    st.markdown(f"### {player['country']} {player['username']}")
-                st.write(f"🏆 {player['level']} • 🔥 {player['streak']} day streak")
-            
-            with col3:
-                st.metric("EcoPoints", f"{player['score']:,}")
-            
-            if is_user:
-                st.markdown("---")
-            else:
-                st.markdown("---")
-
-def show_royal_rewards():
-    st.markdown("## 🎁 Royal Rewards Treasury")
-    
-    user_data = st.session_state.user_data
-    
-    # Available points
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        create_animated_metric("EcoPoints", f"{user_data['score']:,}", "Available to spend", "💎", "#667eea")
+        st.metric(
+            label="🌳 Trees Planted Equivalent",
+            value="56 trees",
+            help="Equal to a small forest grove"
+        )
+        
+        st.metric(
+            label="⚡ Energy Saved",
+            value="2,847 kWh",
+            help="Enough to power a home for 3 months"
+        )
+        
+        st.metric(
+            label="🐧 Polar Ice Saved",
+            value="12.4 m²",
+            help="Size of a small room"
+        )
     
     with col2:
-        create_animated_metric("Trees Planted", str(user_data['trees_planted']), "Real impact made", "🌳", "#28a745")
-    
-    with col3:
-        create_animated_metric("Rewards Claimed", "7", "This month", "🏆", "#ffc107")
+        st.markdown("#### 📊 How You Compare")
+        
+        # Create comparison chart using Plotly
+        categories = ['You', 'City Average', 'National Average']
+        values = [347, 523, 1247]
+        colors = ['#2ed573', '#ffa502', '#ff4757']
+        
+        fig = go.Figure(data=[go.Bar(
+            x=categories,
+            y=values,
+            marker=dict(color=colors),
+            text=[f'{v} kg CO₂' for v in values],
+            textposition='auto',
+        )])
+        
+        fig.update_layout(
+            title='Monthly Carbon Footprint Comparison',
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            font=dict(color="#ffffff"),
+            title_font=dict(size=16, color="#00d4ff"),
+            xaxis=dict(gridcolor='#333'),
+            yaxis=dict(gridcolor='#333', title='CO₂ (kg)'),
+            height=300
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Success message
+        st.success("🎉 You're 72% below the national average!")
     
     st.markdown("---")
     
-    # Reward categories
-    st.markdown("### 🌱 Environmental Impact")
+    # Fun carbon calculator using Streamlit inputs
+    st.markdown("### 🧮 Quick Carbon Calculator")
     
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        st.markdown("#### 🌳 Plant a Tree")
-        st.write("Plant a real tree in partnership with One Tree Planted")
-        st.write("**Cost:** 💎 500 EcoPoints")
-        if st.button("🛒 Claim Tree", key="tree"):
-            if user_data['score'] >= 500:
-                st.success("Tree planted! 🌳")
-            else:
-                st.error("Need more EcoPoints!")
+        st.markdown("**🚗 Transportation**")
+        miles = st.number_input("Miles driven this week", min_value=0, value=50, step=5)
+        transport_co2 = miles * 0.404  # kg CO2 per mile
+        st.metric("CO₂ Impact", f"{transport_co2:.1f} kg")
     
     with col2:
-        st.markdown("#### 🌍 Carbon Offset")
-        st.write("Offset 1 ton of CO₂ through verified projects")
-        st.write("**Cost:** 💎 1,000 EcoPoints")
-        if st.button("🛒 Claim Offset", key="offset"):
-            if user_data['score'] >= 1000:
-                st.success("Carbon offset purchased! 🌍")
-            else:
-                st.error("Need more EcoPoints!")
+        st.markdown("**⚡ Energy**")
+        kwh = st.number_input("kWh used this week", min_value=0, value=150, step=10)
+        energy_co2 = kwh * 0.5  # kg CO2 per kWh
+        st.metric("CO₂ Impact", f"{energy_co2:.1f} kg")
     
     with col3:
-        st.markdown("#### 🐠 Coral Reef Protection")
-        st.write("Support coral reef conservation efforts")
-        st.write("**Cost:** 💎 2,000 EcoPoints")
-        if st.button("🛒 Claim Protection", key="coral"):
-            if user_data['score'] >= 2000:
-                st.success("Coral reef protected! 🐠")
-            else:
-                st.error("Need more EcoPoints!")
+        st.markdown("**🍔 Food**")
+        meals = st.number_input("Meat meals this week", min_value=0, value=7, step=1)
+        food_co2 = meals * 2.5  # kg CO2 per meat meal
+        st.metric("CO₂ Impact", f"{food_co2:.1f} kg")
     
+    # Total calculation
+    total_weekly = transport_co2 + energy_co2 + food_co2
+    
+    # Display total using Streamlit components
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric(
+            label="Weekly Total",
+            value=f"{total_weekly:.1f} kg CO₂",
+            delta=f"Monthly: {total_weekly * 4.33:.1f} kg"
+        )
+    
+    with col2:
+        if total_weekly < 50:
+            st.success("🌟 Excellent! Very low carbon footprint")
+        elif total_weekly < 100:
+            st.info("👍 Good job! Room for improvement")
+        else:
+            st.warning("⚠️ Consider reducing your carbon footprint")
+    
+    # Eco tips using Streamlit info boxes
     st.markdown("---")
+    st.markdown("### 💡 Eco Tips of the Day")
     
-    st.markdown("### 🛍️ Eco-Friendly Products")
+    tips = [
+        "🌡️ Lower your thermostat by 2°F to save 2,000 lbs of CO₂ per year",
+        "💡 Switch to LED bulbs - they use 75% less energy than incandescent",
+        "🚿 Take shorter showers to save both water and the energy to heat it",
+        "🚲 Bike or walk for trips under 2 miles instead of driving",
+        "📱 Unplug electronics when not in use - they draw power even when off"
+    ]
     
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.markdown("#### 🥢 Bamboo Utensil Set")
-        st.write("Sustainable bamboo cutlery set")
-        st.write("**Cost:** 💎 300 EcoPoints")
-        if st.button("🛒 Claim Utensils", key="utensils"):
-            if user_data['score'] >= 300:
-                st.success("Bamboo utensils ordered! 🥢")
-            else:
-                st.error("Need more EcoPoints!")
-    
-    with col2:
-        st.markdown("#### 💧 Reusable Water Bottle")
-        st.write("Premium stainless steel water bottle")
-        st.write("**Cost:** 💎 400 EcoPoints")
-        if st.button("🛒 Claim Bottle", key="bottle"):
-            if user_data['score'] >= 400:
-                st.success("Water bottle ordered! 💧")
-            else:
-                st.error("Need more EcoPoints!")
-    
-    with col3:
-        st.markdown("#### ☀️ Solar Power Bank")
-        st.write("Portable solar-powered device charger")
-        st.write("**Cost:** 💎 800 EcoPoints")
-        if st.button("🛒 Claim Power Bank", key="solar"):
-            if user_data['score'] >= 800:
-                st.success("Solar power bank ordered! ☀️")
-            else:
-                st.error("Need more EcoPoints!")
-
+    # Display tips using Streamlit info components
+    for i, tip in enumerate(tips[:3]):
+        if i == 0:
+            st.info(tip)
+        elif i == 1:
+            st.success(tip)
+        else:
+            st.warning(tip)
 if __name__ == "__main__":
     main()
