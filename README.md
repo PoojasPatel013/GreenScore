@@ -1,3 +1,13 @@
+# 🌍 CarbonTrace - Complete Setup Guide
+
+## 🚀 **Quick Start (Recommended)**
+
+### **Option 1: One-Click Setup**
+```bash
+# Download and run the complete setup
+python run_setup.py
+
+
 # GreenScore - Personal Carbon Footprint Tracker
 
 An AI-powered application that helps users track and reduce their carbon footprint through gamification and rewards.

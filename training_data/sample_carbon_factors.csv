@@ -1,0 +1,10 @@
+category,subcategory,unit,kg_co2_per_unit
+Transportation,gasoline_car,mile,0.404
+Transportation,electric_car,mile,0.18
+Transportation,bus,mile,0.08
+Transportation,flight,mile,0.255
+Energy,electricity_us,kwh,0.5
+Energy,natural_gas,therm,5.3
+Food,beef,kg,60.0
+Food,chicken,kg,6.9
+Food,vegetables,kg,0.4
