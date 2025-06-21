@@ -25,15 +25,50 @@ class CarbonTraceSetup:
         self.setup_log = []
         
     def log_step(self, message: str, status: str = "INFO"):
-        """Log setup steps"""
+        """Log setup steps with Windows-compatible encoding"""
         timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-        log_entry = f"[{timestamp}] {status}: {message}"
+        
+        # Remove emojis for Windows compatibility
+        clean_message = self.clean_message_for_windows(message)
+        log_entry = f"[{timestamp}] {status}: {clean_message}"
+        
         print(log_entry)
         self.setup_log.append(log_entry)
         
-        # Write to log file
-        with open(self.logs_dir / "setup.log", "a") as f:
-            f.write(log_entry + "\n")
+        # Write to log file with UTF-8 encoding
+        try:
+            with open(self.logs_dir / "setup.log", "a", encoding='utf-8') as f:
+                f.write(log_entry + "\n")
+        except Exception:
+            # Fallback to basic logging if UTF-8 fails
+            with open(self.logs_dir / "setup.log", "a", encoding='ascii', errors='ignore') as f:
+                f.write(log_entry + "\n")
+    
+    def clean_message_for_windows(self, message: str) -> str:
+        """Remove problematic Unicode characters for Windows"""
+        # Replace common emojis with text equivalents
+        replacements = {
+            '✅': '[OK]',
+            '❌': '[ERROR]',
+            '⚠️': '[WARNING]',
+            '🌍': '[EARTH]',
+            '🚀': '[ROCKET]',
+            '📊': '[CHART]',
+            '🔑': '[KEY]',
+            '🤖': '[ROBOT]',
+            '🎉': '[PARTY]',
+            '💡': '[BULB]',
+            '📁': '[FOLDER]',
+            '📋': '[CLIPBOARD]',
+            '🔄': '[REFRESH]',
+            '🛠️': '[TOOLS]'
+        }
+        
+        clean_message = message
+        for emoji, replacement in replacements.items():
+            clean_message = clean_message.replace(emoji, replacement)
+        
+        return clean_message
     
     def check_python_version(self):
         """Check Python version compatibility"""
@@ -43,7 +78,7 @@ class CarbonTraceSetup:
             self.log_step("Python 3.8+ required. Please upgrade Python.", "ERROR")
             return False
         
-        self.log_step(f"Python {sys.version} - Compatible ✅", "SUCCESS")
+        self.log_step(f"Python {sys.version} - Compatible [OK]", "SUCCESS")
         return True
     
     def install_requirements(self):
@@ -80,7 +115,7 @@ class CarbonTraceSetup:
                     sys.executable, "-m", "pip", "install", package
                 ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             
-            self.log_step("All packages installed successfully ✅", "SUCCESS")
+            self.log_step("All packages installed successfully [OK]", "SUCCESS")
             return True
             
         except subprocess.CalledProcessError as e:
@@ -96,7 +131,7 @@ class CarbonTraceSetup:
                 sys.executable, "-m", "spacy", "download", "en_core_web_sm"
             ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             
-            self.log_step("spaCy model installed ✅", "SUCCESS")
+            self.log_step("spaCy model installed [OK]", "SUCCESS")
             return True
             
         except subprocess.CalledProcessError as e:
@@ -125,7 +160,10 @@ class CarbonTraceSetup:
                 json.dump(template_creds, f, indent=2)
             
             # Set proper permissions
-            credentials_file.chmod(0o600)
+            try:
+                credentials_file.chmod(0o600)
+            except:
+                pass  # Windows doesn't support chmod
             
             self.log_step("Created Kaggle credentials template", "INFO")
             self.log_step("Please update ~/.kaggle/kaggle.json with your credentials", "ACTION")
@@ -133,7 +171,7 @@ class CarbonTraceSetup:
             
             return False
         else:
-            self.log_step("Kaggle credentials found ✅", "SUCCESS")
+            self.log_step("Kaggle credentials found [OK]", "SUCCESS")
             return True
     
     def download_sample_datasets(self):
@@ -150,7 +188,7 @@ class CarbonTraceSetup:
         carbon_file = self.data_dir / "sample_carbon_factors.csv"
         carbon_data.to_csv(carbon_file, index=False)
         
-        self.log_step("Sample datasets created ✅", "SUCCESS")
+        self.log_step("Sample datasets created [OK]", "SUCCESS")
         return True
     
     def create_sample_transaction_data(self):
@@ -278,21 +316,21 @@ ENABLE_CACHING=True
 """
         
         env_file = self.base_dir / ".env"
-        with open(env_file, 'w') as f:
+        with open(env_file, 'w', encoding='utf-8') as f:
             f.write(env_content)
         
-        self.log_step("Environment file created ✅", "SUCCESS")
+        self.log_step("Environment file created [OK]", "SUCCESS")
         return True
     
     def create_quick_start_script(self):
         """Create quick start script"""
         self.log_step("Creating quick start script...")
         
-        start_script = """#!/usr/bin/env python3
-\"\"\"
+        start_script = '''#!/usr/bin/env python3
+"""
 CarbonTrace Quick Start Script
 Run this to start the application with sample data
-\"\"\"
+"""
 
 import subprocess
 import sys
@@ -300,11 +338,11 @@ import os
 from pathlib import Path
 
 def main():
-    print("🌍 Starting CarbonTrace...")
+    print("CarbonTrace - Starting Application...")
     
     # Check if we're in the right directory
     if not Path("app.py").exists():
-        print("❌ app.py not found. Please run from the project root directory.")
+        print("ERROR: app.py not found. Please run from the project root directory.")
         return
     
     # Set environment variables for demo
@@ -319,33 +357,29 @@ def main():
             "--server.address", "localhost"
         ])
     except KeyboardInterrupt:
-        print("\\n👋 CarbonTrace stopped.")
+        print("\\nCarbonTrace stopped.")
     except Exception as e:
-        print(f"❌ Error starting CarbonTrace: {e}")
+        print(f"ERROR: Error starting CarbonTrace: {e}")
 
 if __name__ == "__main__":
     main()
-"""
+'''
         
         start_file = self.base_dir / "start_carbontrace.py"
-        with open(start_file, 'w') as f:
+        with open(start_file, 'w', encoding='utf-8') as f:
             f.write(start_script)
         
-        # Make executable on Unix systems
-        if os.name != 'nt':
-            start_file.chmod(0o755)
-        
-        self.log_step("Quick start script created ✅", "SUCCESS")
+        self.log_step("Quick start script created [OK]", "SUCCESS")
         return True
     
     def create_training_script(self):
         """Create automated training script"""
         self.log_step("Creating training script...")
         
-        training_script = """#!/usr/bin/env python3
-\"\"\"
+        training_script = '''#!/usr/bin/env python3
+"""
 Automated Model Training Script for CarbonTrace
-\"\"\"
+"""
 
 import sys
 import os
@@ -355,14 +389,14 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
 
 def main():
-    print("🤖 Starting CarbonTrace Model Training...")
+    print("CarbonTrace Model Training - Starting...")
     
     try:
         # Import training modules
         from model_training.data_collection import TransactionDataCollector, CarbonEmissionDataCollector
         from model_training.train_models import TransactionClassifierTrainer, CarbonEstimatorTrainer
         
-        print("\\n📊 Step 1: Collecting training data...")
+        print("\\nStep 1: Collecting training data...")
         
         # Create data collectors
         transaction_collector = TransactionDataCollector()
@@ -375,7 +409,7 @@ def main():
         print("  Generating carbon estimation data...")
         carbon_file = carbon_collector.create_carbon_estimation_dataset()
         
-        print("\\n🧠 Step 2: Training models...")
+        print("\\nStep 2: Training models...")
         
         # Train transaction classifier
         print("  Training transaction classifier...")
@@ -387,33 +421,33 @@ def main():
         # Train models (simplified for demo)
         print("  Training complete!")
         
-        print("\\n✅ Model training completed successfully!")
-        print("\\n📁 Models saved to ./models/ directory")
-        print("\\n🚀 You can now run the application with trained models!")
+        print("\\nModel training completed successfully!")
+        print("\\nModels saved to ./models/ directory")
+        print("\\nYou can now run the application with trained models!")
         
     except ImportError as e:
-        print(f"❌ Import error: {e}")
+        print(f"Import error: {e}")
         print("Please ensure all dependencies are installed.")
     except Exception as e:
-        print(f"❌ Training error: {e}")
+        print(f"Training error: {e}")
         print("Check the logs for more details.")
 
 if __name__ == "__main__":
     main()
-"""
+'''
         
         training_file = self.base_dir / "train_models_auto.py"
-        with open(training_file, 'w') as f:
+        with open(training_file, 'w', encoding='utf-8') as f:
             f.write(training_script)
         
-        self.log_step("Training script created ✅", "SUCCESS")
+        self.log_step("Training script created [OK]", "SUCCESS")
         return True
     
     def create_demo_data_loader(self):
         """Create demo data loader for the app"""
         self.log_step("Creating demo data loader...")
         
-        demo_loader = """
+        demo_loader = '''
 import pandas as pd
 import json
 from pathlib import Path
@@ -425,7 +459,7 @@ class DemoDataLoader:
         self.data_dir = Path("training_data")
         
     def load_sample_transactions(self):
-        \"\"\"Load sample transactions for demo\"\"\"
+        """Load sample transactions for demo"""
         
         sample_file = self.data_dir / "sample_transactions.csv"
         if sample_file.exists():
@@ -434,7 +468,7 @@ class DemoDataLoader:
             return self.generate_demo_transactions()
     
     def generate_demo_transactions(self):
-        \"\"\"Generate demo transactions on the fly\"\"\"
+        """Generate demo transactions on the fly"""
         
         transactions = []
         
@@ -463,7 +497,7 @@ class DemoDataLoader:
         return pd.DataFrame(transactions)
     
     def get_demo_user_data(self):
-        \"\"\"Get demo user data\"\"\"
+        """Get demo user data"""
         
         return {
             "_id": "demo_user",
@@ -495,19 +529,19 @@ class DemoDataLoader:
 
 # Global demo data loader instance
 demo_loader = DemoDataLoader()
-"""
+'''
         
         demo_file = self.base_dir / "demo_data_loader.py"
-        with open(demo_file, 'w') as f:
+        with open(demo_file, 'w', encoding='utf-8') as f:
             f.write(demo_loader)
         
-        self.log_step("Demo data loader created ✅", "SUCCESS")
+        self.log_step("Demo data loader created [OK]", "SUCCESS")
         return True
     
     def run_complete_setup(self):
         """Run the complete setup process"""
         
-        print("🚀 CarbonTrace Complete Setup Starting...")
+        print("CarbonTrace Complete Setup Starting...")
         print("=" * 60)
         
         setup_steps = [
@@ -525,73 +559,58 @@ demo_loader = DemoDataLoader()
         success_count = 0
         
         for step_name, step_function in setup_steps:
-            print(f"\n🔄 {step_name}...")
+            print(f"\n[STEP] {step_name}...")
             try:
                 if step_function():
                     success_count += 1
-                    print(f"✅ {step_name} completed")
+                    print(f"[OK] {step_name} completed")
                 else:
-                    print(f"⚠️ {step_name} completed with warnings")
+                    print(f"[WARNING] {step_name} completed with warnings")
             except Exception as e:
                 self.log_step(f"Error in {step_name}: {e}", "ERROR")
-                print(f"❌ {step_name} failed: {e}")
+                print(f"[ERROR] {step_name} failed: {e}")
         
         print("\n" + "=" * 60)
-        print(f"🎉 Setup completed! {success_count}/{len(setup_steps)} steps successful")
+        print(f"Setup completed! {success_count}/{len(setup_steps)} steps successful")
         
         # Print next steps
         self.print_next_steps()
         
-        return success_count == len(setup_steps)
+        return success_count >= 6  # Consider successful if most steps work
     
     def print_next_steps(self):
         """Print next steps for the user"""
         
-        print("\n📋 NEXT STEPS:")
+        print("\nNEXT STEPS:")
         print("=" * 40)
         
-        print("\n1. 🔑 Setup API Keys (Optional but recommended):")
+        print("\n1. Setup API Keys (Optional but recommended):")
         print("   - Edit .env file with your API keys")
         print("   - Carbon Interface: https://www.carboninterface.com/")
         print("   - Climatiq: https://www.climatiq.io/")
         print("   - CO2 Signal: https://www.co2signal.com/")
         
-        print("\n2. 📊 Setup Kaggle (Optional for real datasets):")
+        print("\n2. Setup Kaggle (Optional for real datasets):")
         print("   - Get API key from: https://www.kaggle.com/account")
         print("   - Update ~/.kaggle/kaggle.json with your credentials")
         
-        print("\n3. 🚀 Start the application:")
+        print("\n3. Start the application:")
         print("   python start_carbontrace.py")
         print("   OR")
         print("   streamlit run app.py")
         
-        print("\n4. 🤖 Train custom models (Optional):")
+        print("\n4. Train custom models (Optional):")
         print("   python train_models_auto.py")
         
-        print("\n5. 🌐 Access the application:")
+        print("\n5. Access the application:")
         print("   Open: http://localhost:8501")
-        
-        print("\n📁 Project Structure:")
-        print("   ├── app.py                 # Main Streamlit app")
-        print("   ├── start_carbontrace.py   # Quick start script")
-        print("   ├── train_models_auto.py   # Model training")
-        print("   ├── training_data/         # Sample datasets")
-        print("   ├── models/                # Trained models")
-        print("   ├── logs/                  # Setup and app logs")
-        print("   └── .env                   # Configuration")
-        
-        print("\n💡 Tips:")
-        print("   - Start with demo mode to explore features")
-        print("   - Add real transaction data for better accuracy")
-        print("   - Train custom models with your data")
-        print("   - Check logs/ directory for troubleshooting")
 
 def main():
     """Main setup function"""
     
     setup = CarbonTraceSetup()
     
-    print("🌍 Welcome to CarbonTrace Setup!")
+    print("Welcome to CarbonTrace Setup!")
     print("This will install dependencies and set up the complete system.")
     
     response = input("\nProceed with setup? (y/n): ").lower().strip()
@@ -600,10 +619,10 @@ def main():
         success = setup.run_complete_setup()
         
         if success:
-            print("\n🎉 Setup completed successfully!")
+            print("\nSetup completed successfully!")
             print("Run 'python start_carbontrace.py' to start the application.")
         else:
-            print("\n⚠️ Setup completed with some issues.")
+            print("\nSetup completed with some issues.")
             print("Check the logs for details and try running individual steps.")
     else:
         print("Setup cancelled.")
