@@ -417,78 +417,8 @@ class CarbonEstimatorTrainer:
 def main():
     """Main training function"""
     
-    print("🚀 Starting model training...")
+    print("Starting model training...")
     
     # Create models directory
-    from pathlib import Path
-    Path("models").mkdir(exist_ok=True)
-    
-    # Train transaction classifier
-    print("\n" + "="*50)
-    print("TRAINING TRANSACTION CLASSIFIER")
-    print("="*50)
-    
-    transaction_trainer = TransactionClassifierTrainer()
-    
-    # Load data
-    X_text, X_numeric, y_category, y_subcategory, y_carbon_intensity, df = transaction_trainer.load_and_prepare_data(
-        'training_data/transaction_training_data.csv'
-    )
-    
-    # Split data
-    X_text_train, X_text_test, X_numeric_train, X_numeric_test, y_cat_train, y_cat_test = train_test_split(
-        X_text, X_numeric, y_category, test_size=0.2, random_state=42, stratify=y_category
-    )
-    
-    # Create text features
-    X_text_train_tfidf, X_text_test_tfidf = transaction_trainer.create_text_features(X_text_train, X_text_test)
-    
-    # Combine features
-    from scipy.sparse import hstack
-    X_train_combined = hstack([X_text_train_tfidf, X_numeric_train])
-    X_test_combined = hstack([X_text_test_tfidf, X_numeric_test])
-    
-    # Train classifier
-    category_results = transaction_trainer.train_category_classifier(
-        X_train_combined, y_cat_train, X_test_combined, y_cat_test
-    )
-    
-    # Train BERT classifier (optional - requires more resources)
-    if input("\nTrain BERT classifier? (y/n): ").lower() == 'y':
-        bert_results = transaction_trainer.train_bert_classifier(X_text, y_category)
-    
-    # Save transaction models
-    transaction_trainer.save_models()
-    
-    # Train carbon estimator
-    print("\n" + "="*50)
-    print("TRAINING CARBON ESTIMATOR")
-    print("="*50)
-    
-    carbon_trainer = CarbonEstimatorTrainer()
-    
-    # Load carbon data
-    X_carbon, y_carbon, carbon_df = carbon_trainer.load_and_prepare_data(
-        'training_data/carbon_estimation_training.csv'
-    )
-    
-    # Train carbon estimator
-    carbon_results = carbon_trainer.train_carbon_estimator(X_carbon, y_carbon)
-    
-    # Save carbon models
-    carbon_trainer.save_models()
-    
-    print("\n🎉 Training complete!")
-    print("\n📁 Models saved to ./models/ directory:")
-    print("   - Transaction classifiers (Random Forest, Logistic Regression)")
-    print("   - Carbon footprint estimator (Gradient Boosting)")
-    print("   - Feature vectorizers and encoders")
-    print("   - Optional: BERT classifier")
-    
-    print("\n📊 Model Performance Summary:")
-    print(f"   - Best transaction classifier accuracy: {max(r['accuracy'] for r in category_results.values()):.4f}")
-    print(f"   - Carbon estimator R²: {carbon_results['r2']:.4f}")
-    print(f"   - Carbon estimator MSE: {carbon_results['mse']:.4f}")
-
 if __name__ == "__main__":
     main()

@@ -12,11 +12,16 @@ from database import Database
 
 # Configure page
 st.set_page_config(
-    page_title="🌍 CarbonTrace | Footprint Tracker",
+    page_title="CarbonTrace | Footprint Tracker",
     page_icon="🌍",
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# Initialize Streamlit session state
+if 'initialized' not in st.session_state:
+    st.session_state.initialized = True
+    st.session_state.user = None
 
 # Load CSS
 def load_css():

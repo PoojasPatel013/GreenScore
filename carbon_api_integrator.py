@@ -119,7 +119,7 @@ class CarbonAPIIntegrator:
         # Try providers in order of preference
         providers = [
             self.carbon_interface,
-            self.co2_signal,
+            self.epa,
             self.fallback
         ]
         
@@ -132,11 +132,46 @@ class CarbonAPIIntegrator:
                 print(f"Error with {provider.__name__}: {str(e)}")
         
         return None
+
+    async def epa(self, activity_type: str, activity_data: Dict) -> Optional[CarbonEstimate]:
+        """Get estimate using EPA data"""
+        
+        # EPA emission factors for electricity by state (2022 data)
+        epa_factors = {
+            'ca': 0.200,  # California
+            'ny': 0.280,  # New York
+            'tx': 0.450,  # Texas
+            'fl': 0.520,  # Florida
+            'default': 0.500  # US Average
+        }
+        
+        if activity_type == 'electricity':
+            state = activity_data.get('state', 'default').lower()
+            factor = epa_factors.get(state, epa_factors['default'])
+            kwh = activity_data.get('kwh', 0)
+            carbon_kg = kwh * factor
+            
+            return CarbonEstimate(
+                carbon_kg=carbon_kg,
+                carbon_lb=carbon_kg * 2.20462,
+                carbon_mt=carbon_kg / 1000,
+                confidence=0.9,
+                source='epa_data',
+                methodology='EPA state-level emission factors',
+                factors_used={
+                    'state': state,
+                    'emission_factor_kg_co2_kwh': factor
+                },
+                timestamp=datetime.now()
+            )
+        
+        return None
     
     async def carbon_interface(self, activity_type: str, activity_data: Dict) -> Optional[CarbonEstimate]:
         """Get estimate from Carbon Interface API"""
         
         if not self.api_keys['carbon_interface']:
+            print("Warning: Carbon Interface API key not set")
             return None
         
         headers = {
@@ -155,11 +190,13 @@ class CarbonAPIIntegrator:
         
         endpoint = endpoint_mapping.get(activity_type)
         if not endpoint:
+            print(f"Warning: No endpoint for activity type: {activity_type}")
             return None
         
         # Prepare request data based on activity type
         request_data = self._prepare_carbon_interface_data(activity_type, activity_data)
         if not request_data:
+            print(f"Warning: Invalid request data for {activity_type}")
             return None
         
         try:
@@ -174,11 +211,11 @@ class CarbonAPIIntegrator:
                         data = await response.json()
                         return self._parse_carbon_interface_response(data)
                     else:
-                        print(f"Carbon Interface API error: {response.status}")
+                        print(f"Carbon Interface API error ({response.status}): {await response.text()}")
                         return None
         
         except Exception as e:
-            print(f"Carbon Interface request error: {e}")
+            print(f"Carbon Interface request error: {str(e)}")
             return None
     
     def _prepare_carbon_interface_data(self, activity_type: str, activity_data: Dict) -> Optional[Dict]:
@@ -292,36 +329,33 @@ class CarbonAPIIntegrator:
             print(f"CO2 Signal request error: {e}")
             return None
     
-    def fallback(self, activity_type: str, activity_data: Dict) -> CarbonEstimate:
+    async def fallback(self, activity_type: str, activity_data: Dict) -> Optional[CarbonEstimate]:
         """Calculate estimate using fallback emission factors"""
         
-        carbon_kg = 0
-        factors_used = {}
+        factors = self.fallback_factors.get(activity_type)
+        if not factors:
+            print(f"Warning: No fallback factors for {activity_type}")
+            return None
         
+        # Get base factor based on activity type and location
+        base_factor = None
+        location = activity_data.get('location', 'us_average')
+        
+        if location in factors:
+            base_factor = factors[location]
+        else:
+            base_factor = factors.get('us_average', 0.5)
+        
+        # Adjust factor based on activity details
         if activity_type == 'electricity':
             kwh = activity_data.get('kwh', 0)
-            region = activity_data.get('region', 'us_average')
-            factor = self.fallback_factors['electricity'].get(region, 0.5)
-            carbon_kg = kwh * factor
-            factors_used = {'emission_factor_kg_co2_kwh': factor, 'region': region}
-        
+            carbon_kg = kwh * base_factor
         elif activity_type == 'transportation':
-            miles = activity_data.get('distance_miles', 0)
+            distance = activity_data.get('distance', 0)
             vehicle_type = activity_data.get('vehicle_type', 'gasoline_car')
-            factor = self.fallback_factors['transportation'].get(vehicle_type, 0.404)
-            carbon_kg = miles * factor
-            factors_used = {'emission_factor_kg_co2_mile': factor, 'vehicle_type': vehicle_type}
-        
-        elif activity_type == 'fuel':
-            gallons = activity_data.get('gallons', 0)
-            fuel_type = activity_data.get('fuel_type', 'gasoline')
-            factor = self.fallback_factors['fuel'].get(fuel_type, 8.89)
-            carbon_kg = gallons * factor
-            factors_used = {'emission_factor_kg_co2_gallon': factor, 'fuel_type': fuel_type}
-        
-        elif activity_type == 'food':
-            kg = activity_data.get('kg', 0)
-            food_type = activity_data.get('food_type', 'mixed')
+            carbon_kg = distance * factors.get(vehicle_type, base_factor)
+        else:
+            carbon_kg = activity_data.get('amount', 0) * base_factor
             factor = self.fallback_factors['food'].get(food_type, 2.5)
             carbon_kg = kg * factor
             factors_used = {'emission_factor_kg_co2_kg': factor, 'food_type': food_type}
