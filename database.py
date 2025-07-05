@@ -9,11 +9,11 @@ class Database:
     def __init__(self):
         # MongoDB connection string - replace with your actual connection string
         # For development, you can use MongoDB Atlas free tier or local MongoDB
-        mongo_uri = os.getenv('MONGODB_URI', 'mongodb://localhost:27017/')
+        mongo_uri = os.getenv('MONGODB_URI', 'mongodb+srv://poojaspatel1375:b4bDSeKdx6Sz1yBi@carbontrace.8xkhyzu.mongodb.net/?retryWrites=true&w=majority&appName=carbontrace')
         
         try:
             self.client = MongoClient(mongo_uri)
-            self.db = self.client['greenscore_app']
+            self.db = self.client['carbontrace']
             
             # Collections
             self.users = self.db['users']

@@ -10,10 +10,8 @@ from enum import Enum
 
 class CarbonAPIProvider(Enum):
     CARBON_INTERFACE = "carbon_interface"
-    CLOVERLY = "cloverly"
-    CO2_SIGNAL = "co2_signal"
-    CLIMATIQ = "climatiq"
     EPA = "epa"
+    FALLBACK = "fallback"
 
 @dataclass
 class CarbonEstimate:
@@ -32,18 +30,13 @@ class CarbonAPIIntegrator:
         
         # API Keys (should be set as environment variables)
         self.api_keys = {
-            'carbon_interface': os.getenv('CARBON_INTERFACE_API_KEY'),
-            'cloverly': os.getenv('CLOVERLY_API_KEY'),
-            'co2_signal': os.getenv('CO2_SIGNAL_API_KEY'),
-            'climatiq': os.getenv('CLIMATIQ_API_KEY')
+            'carbon_interface': os.getenv('CARBON_INTERFACE_API_KEY')
         }
         
         # API Endpoints
         self.endpoints = {
             'carbon_interface': 'https://www.carboninterface.com/api/v1',
-            'cloverly': 'https://api.cloverly.com/2019-03-beta',
-            'co2_signal': 'https://api.co2signal.com/v1',
-            'climatiq': 'https://beta3.api.climatiq.io'
+            'co2_signal': 'https://api.co2signal.com/v1/latest'
         }
         
         # Fallback emission factors (EPA/IPCC data)
@@ -111,72 +104,36 @@ class CarbonAPIIntegrator:
             }
         }
     
-    async def get_carbon_estimate(self, activity_type: str, activity_data: Dict, 
-                                 preferred_provider: CarbonAPIProvider = None) -> CarbonEstimate:
+    async def get_carbon_estimate(self, activity_type: str, activity_data: Dict) -> CarbonEstimate:
         """
-        Get carbon estimate from multiple providers with fallback
+        Get carbon estimate using Carbon Interface with EPA and fallback as backup
         
         Args:
-            activity_type: Type of activity (electricity, transportation, etc.)
-            activity_data: Activity-specific data (amount, location, etc.)
-            preferred_provider: Preferred API provider
-            
+            activity_type: Type of activity (e.g., 'transport', 'energy')
+            activity_data: Dictionary containing activity-specific data
+        
         Returns:
-            CarbonEstimate object
+            CarbonEstimate object with the best available estimate
         """
         
-        # Try preferred provider first
-        if preferred_provider:
-            try:
-                estimate = await self._get_estimate_from_provider(
-                    preferred_provider, activity_type, activity_data
-                )
-                if estimate:
-                    return estimate
-            except Exception as e:
-                print(f"Error with preferred provider {preferred_provider}: {e}")
-        
-        # Try all providers in order of reliability
+        # Try providers in order of preference
         providers = [
-            CarbonAPIProvider.CARBON_INTERFACE,
-            CarbonAPIProvider.CLIMATIQ,
-            CarbonAPIProvider.CLOVERLY,
-            CarbonAPIProvider.CO2_SIGNAL
+            self.carbon_interface,
+            self.co2_signal,
+            self.fallback
         ]
         
         for provider in providers:
-            if provider == preferred_provider:
-                continue  # Already tried
-            
             try:
-                estimate = await self._get_estimate_from_provider(
-                    provider, activity_type, activity_data
-                )
+                estimate = await provider(activity_type, activity_data)
                 if estimate:
                     return estimate
             except Exception as e:
-                print(f"Error with provider {provider}: {e}")
-                continue
-        
-        # Fallback to local calculations
-        return self._calculate_fallback_estimate(activity_type, activity_data)
-    
-    async def _get_estimate_from_provider(self, provider: CarbonAPIProvider, 
-                                        activity_type: str, activity_data: Dict) -> Optional[CarbonEstimate]:
-        """Get estimate from specific provider"""
-        
-        if provider == CarbonAPIProvider.CARBON_INTERFACE:
-            return await self._carbon_interface_estimate(activity_type, activity_data)
-        elif provider == CarbonAPIProvider.CLOVERLY:
-            return await self._cloverly_estimate(activity_type, activity_data)
-        elif provider == CarbonAPIProvider.CO2_SIGNAL:
-            return await self._co2_signal_estimate(activity_type, activity_data)
-        elif provider == CarbonAPIProvider.CLIMATIQ:
-            return await self._climatiq_estimate(activity_type, activity_data)
+                print(f"Error with {provider.__name__}: {str(e)}")
         
         return None
     
-    async def _carbon_interface_estimate(self, activity_type: str, activity_data: Dict) -> Optional[CarbonEstimate]:
+    async def carbon_interface(self, activity_type: str, activity_data: Dict) -> Optional[CarbonEstimate]:
         """Get estimate from Carbon Interface API"""
         
         if not self.api_keys['carbon_interface']:
@@ -287,110 +244,14 @@ class CarbonAPIIntegrator:
             timestamp=datetime.now()
         )
     
-    async def _climatiq_estimate(self, activity_type: str, activity_data: Dict) -> Optional[CarbonEstimate]:
-        """Get estimate from Climatiq API"""
-        
-        if not self.api_keys['climatiq']:
-            return None
-        
-        headers = {
-            'Authorization': f'Bearer {self.api_keys["climatiq"]}',
-            'Content-Type': 'application/json'
-        }
-        
-        # Climatiq uses emission factors
-        emission_factor_id = self._get_climatiq_emission_factor(activity_type, activity_data)
-        if not emission_factor_id:
-            return None
-        
-        request_data = {
-            'emission_factor': emission_factor_id,
-            'parameters': self._prepare_climatiq_parameters(activity_type, activity_data)
-        }
-        
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    f"{self.endpoints['climatiq']}/estimate",
-                    headers=headers,
-                    json=request_data
-                ) as response:
-                    
-                    if response.status == 200:
-                        data = await response.json()
-                        return self._parse_climatiq_response(data)
-                    else:
-                        print(f"Climatiq API error: {response.status}")
-                        return None
-        
-        except Exception as e:
-            print(f"Climatiq request error: {e}")
-            return None
-    
-    def _get_climatiq_emission_factor(self, activity_type: str, activity_data: Dict) -> Optional[str]:
-        """Get appropriate Climatiq emission factor ID"""
-        
-        # Mapping of activity types to Climatiq emission factor IDs
-        factor_mapping = {
-            'electricity': 'electricity-energy_source_grid_mix',
-            'transportation': 'passenger_vehicle-vehicle_type_car-fuel_source_gasoline',
-            'flight': 'passenger_flight-route_type_domestic',
-            'fuel': 'fuel_combustion-fuel_source_gasoline'
-        }
-        
-        return factor_mapping.get(activity_type)
-    
-    def _prepare_climatiq_parameters(self, activity_type: str, activity_data: Dict) -> Dict:
-        """Prepare parameters for Climatiq API"""
-        
-        if activity_type == 'electricity':
-            return {
-                'energy': activity_data.get('kwh', 0),
-                'energy_unit': 'kWh'
-            }
-        elif activity_type == 'transportation':
-            return {
-                'distance': activity_data.get('distance_miles', 0),
-                'distance_unit': 'mi'
-            }
-        elif activity_type == 'fuel':
-            return {
-                'volume': activity_data.get('gallons', 0),
-                'volume_unit': 'gal'
-            }
-        
-        return {}
-    
-    def _parse_climatiq_response(self, data: Dict) -> CarbonEstimate:
-        """Parse Climatiq API response"""
-        
-        co2e = data.get('co2e', 0)  # kg CO2 equivalent
-        co2e_unit = data.get('co2e_unit', 'kg')
-        
-        # Convert to standard units
-        carbon_kg = co2e if co2e_unit == 'kg' else co2e * 1000 if co2e_unit == 't' else co2e / 1000
-        carbon_lb = carbon_kg * 2.20462
-        carbon_mt = carbon_kg / 1000
-        
-        return CarbonEstimate(
-            carbon_kg=carbon_kg,
-            carbon_lb=carbon_lb,
-            carbon_mt=carbon_mt,
-            confidence=0.85,
-            source='Climatiq',
-            methodology='API',
-            factors_used=data.get('emission_factor', {}),
-            timestamp=datetime.now()
-        )
-    
-    async def _co2_signal_estimate(self, activity_type: str, activity_data: Dict) -> Optional[CarbonEstimate]:
+    async def co2_signal(self, activity_type: str, activity_data: Dict) -> Optional[CarbonEstimate]:
         """Get real-time electricity carbon intensity from CO2 Signal"""
         
-        if activity_type != 'electricity' or not self.api_keys['co2_signal']:
+        if activity_type != 'electricity':
             return None
         
         headers = {
-            'auth-token': self.api_keys['co2_signal']
+            'auth-token': 'YOUR_API_KEY'  # Replace with your API key
         }
         
         # Get carbon intensity for location
@@ -431,7 +292,7 @@ class CarbonAPIIntegrator:
             print(f"CO2 Signal request error: {e}")
             return None
     
-    def _calculate_fallback_estimate(self, activity_type: str, activity_data: Dict) -> CarbonEstimate:
+    def fallback(self, activity_type: str, activity_data: Dict) -> CarbonEstimate:
         """Calculate estimate using fallback emission factors"""
         
         carbon_kg = 0
