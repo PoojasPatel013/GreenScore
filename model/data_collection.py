@@ -166,6 +166,28 @@ class TransactionDataCollector:
         
         return pd.DataFrame(transactions)
     
+    def create_training_dataset(self, output_file: str = "transaction_training_data.csv") -> str:
+        """Create comprehensive training dataset"""
+        
+        print("Generating synthetic transactions...")
+        synthetic_data = self.generate_synthetic_transactions(10000)
+        
+        print("Collecting merchant data...")
+        merchant_data = self.collect_real_merchant_data()
+        
+        # Enhance synthetic data with merchant information
+        enhanced_data = self.enhance_with_merchant_data(synthetic_data, merchant_data)
+        
+        # Add features for model training
+        final_data = self.add_training_features(enhanced_data)
+        
+        # Save to file
+        final_data.to_csv(output_file, index=False)
+        print(f"Training dataset saved to {output_file}")
+        print(f"Dataset contains {len(final_data)} transactions")
+        
+        return output_file
+    
     def _generate_transaction_description(self, merchant: str, keywords: List[str]) -> str:
         """Generate realistic transaction descriptions"""
         
@@ -335,38 +357,9 @@ class TransactionDataCollector:
                 'merchant_name': merchant,
                 'category': data['category'],
                 'subcategory': data['subcategory'],
-                'carbon_factor_per_dollar': data['carbon_factor'],
-                'data_source': 'manual_compilation'
+                'carbon_factor_per_dollar': data['carbon_factor']
             })
-        
-        return pd.DataFrame(merchants_data)
-    
-    def create_training_dataset(self, output_file: str = "transaction_training_data.csv") -> str:
-        """Create comprehensive training dataset"""
-        
-        print("🔄 Generating synthetic transactions...")
-        synthetic_data = self.generate_synthetic_transactions(10000)
-        
-        print("🔄 Collecting merchant data...")
-        merchant_data = self.collect_real_merchant_data()
-        
-        # Enhance synthetic data with merchant information
-        enhanced_data = self.enhance_with_merchant_data(synthetic_data, merchant_data)
-        
-        # Add features for model training
-        final_data = self.add_training_features(enhanced_data)
-        
-        # Save to file
-        final_data.to_csv(output_file, index=False)
-        print(f"✅ Training dataset saved to {output_file}")
-        print(f"📊 Dataset contains {len(final_data)} transactions")
-        
-        return output_file
-    
-    def enhance_with_merchant_data(self, transactions: pd.DataFrame, merchants: pd.DataFrame) -> pd.DataFrame:
-        """Enhance transaction data with merchant information"""
-        
-        # Create merchant lookup
+        merchants = pd.DataFrame(merchants_data)     # Create merchant lookup
         merchant_lookup = merchants.set_index('merchant_name').to_dict('index')
         
         # Add merchant-specific carbon factors
@@ -535,7 +528,7 @@ class CarbonEmissionDataCollector:
 def main():
     """Main function to collect all training data"""
     
-    print("🚀 Starting data collection for model training...")
+    print("Starting data collection for model training...")
     
     # Initialize collectors
     transaction_collector = TransactionDataCollector()
@@ -552,12 +545,12 @@ def main():
     print("\n2. Creating carbon estimation dataset...")
     carbon_file = carbon_collector.create_carbon_estimation_dataset("training_data/carbon_estimation_training.csv")
     
-    print("\n🎉 Data collection complete!")
-    print(f"\n📁 Files created:")
+    print("\nData collection complete!")
+    print(f"\nFiles created:")
     print(f"   - {transaction_file}")
     print(f"   - {carbon_file}")
     
-    print(f"\n📋 Next steps:")
+    print(f"\nNext steps:")
     print(f"   1. Review the generated datasets")
     print(f"   2. Download additional Kaggle datasets")
     print(f"   3. Train the models using train_models.py")
